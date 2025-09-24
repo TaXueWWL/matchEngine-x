@@ -149,6 +149,15 @@ function subscribeToUpdates() {
             updateOrderBook(orderBook);
         });
 
+        // Subscribe to price updates
+        console.log('Subscribing to price updates for', currentSymbol);
+        stompClient.subscribe('/topic/price/' + currentSymbol, function(message) {
+            console.log('Received price update:', message);
+            const priceData = JSON.parse(message.body);
+            console.log('Parsed price data:', priceData);
+            updateCurrentPrice(priceData);
+        });
+
         // Subscribe to trade updates
         console.log('Subscribing to trade updates for', currentSymbol);
         stompClient.subscribe('/topic/trades/' + currentSymbol, function(message) {
@@ -451,7 +460,7 @@ function updateOrderBook(orderBook) {
     }
 
     // Update current price and spread
-    updateCurrentPrice(buyLevels, sellLevels);
+    updateCurrentPriceFromOrderBook(buyLevels, sellLevels);
 }
 
 function fillOrderForm(side, price) {
@@ -464,7 +473,7 @@ function fillOrderForm(side, price) {
     }
 }
 
-function updateCurrentPrice(buyLevels, sellLevels) {
+function updateCurrentPriceFromOrderBook(buyLevels, sellLevels) {
     const lastPriceElement = document.getElementById('last-price');
     const priceChangeElement = document.getElementById('price-change');
     const priceLabelElement = document.getElementById('price-label');
@@ -1112,4 +1121,53 @@ function submitModifyOrder() {
         console.error('Error modifying order:', error);
         alert('订单修改失败，请重试');
     });
+}
+
+// Store previous price for comparison
+let previousPrice = null;
+
+/**
+ * Update current price from WebSocket price data
+ */
+function updateCurrentPrice(priceData) {
+    console.log('Updating current price with:', priceData);
+    const lastPriceElement = document.getElementById('last-price');
+    const priceChangeElement = document.getElementById('price-change');
+    const priceLabelElement = document.getElementById('price-label');
+
+    if (priceData && priceData.price) {
+        const currentPrice = parseFloat(priceData.price);
+
+        // Update price display
+        if (lastPriceElement) {
+            lastPriceElement.textContent = `¥${currentPrice.toFixed(2)}`;
+
+            // Add flash animation for price changes
+            lastPriceElement.classList.add('flash-update');
+            setTimeout(() => {
+                lastPriceElement.classList.remove('flash-update');
+            }, 500);
+        }
+
+        // Calculate and display price change if we have previous price
+        if (priceChangeElement && previousPrice !== null) {
+            const priceChange = currentPrice - previousPrice;
+            const changePercent = (priceChange / previousPrice) * 100;
+
+            priceChangeElement.textContent = `${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%`;
+            priceChangeElement.className = `price-change ms-2 ${changePercent >= 0 ? 'positive' : 'negative'}`;
+        } else if (priceChangeElement) {
+            // Default display when no previous price
+            priceChangeElement.textContent = '0.00%';
+            priceChangeElement.className = 'price-change ms-2';
+        }
+
+        if (priceLabelElement) {
+            const timestamp = new Date(priceData.timestamp || Date.now());
+            priceLabelElement.textContent = `更新时间: ${timestamp.toLocaleTimeString()}`;
+        }
+
+        // Store current price as previous price for next update
+        previousPrice = currentPrice;
+    }
 }
