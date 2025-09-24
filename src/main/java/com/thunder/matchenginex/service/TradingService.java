@@ -3,6 +3,7 @@ package com.thunder.matchenginex.service;
 import com.thunder.matchenginex.config.TradingPair;
 import com.thunder.matchenginex.config.TradingPairsConfig;
 import com.thunder.matchenginex.enums.OrderSide;
+import com.thunder.matchenginex.enums.OrderStatus;
 import com.thunder.matchenginex.enums.OrderType;
 import com.thunder.matchenginex.event.OrderEventProducer;
 import com.thunder.matchenginex.model.Command;
@@ -10,6 +11,7 @@ import com.thunder.matchenginex.model.Order;
 import com.thunder.matchenginex.orderbook.OrderBook;
 import com.thunder.matchenginex.orderbook.OrderBookManager;
 import com.thunder.matchenginex.service.AccountService;
+import com.thunder.matchenginex.constant.TradingConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,7 @@ public class TradingService {
     private final OrderBookManager orderBookManager;
     private final TradingPairsConfig tradingPairsConfig;
     private final AccountService accountService;
+    private final com.thunder.matchenginex.util.CurrencyUtils currencyUtils;
     private final AtomicLong orderIdGenerator = new AtomicLong(1);
 
     public long placeOrder(String symbol, long userId, OrderSide side, OrderType orderType,
@@ -174,8 +177,8 @@ public class TradingService {
     public List<Order> getUserCurrentOrders(long userId, String symbol) {
         OrderBook orderBook = orderBookManager.getOrderBook(symbol);
         return orderBook.getUserOrders(userId).stream()
-                .filter(order -> order.getStatus().name().equals("NEW") ||
-                               order.getStatus().name().equals("PARTIALLY_FILLED"))
+                .filter(order -> order.getStatus() == OrderStatus.NEW ||
+                               order.getStatus() == OrderStatus.PARTIALLY_FILLED)
                 .toList();
     }
 
@@ -186,8 +189,8 @@ public class TradingService {
         for (String symbol : symbols) {
             OrderBook orderBook = orderBookManager.getOrderBook(symbol);
             List<Order> userOrders = orderBook.getUserOrders(userId).stream()
-                    .filter(order -> order.getStatus().name().equals("NEW") ||
-                                   order.getStatus().name().equals("PARTIALLY_FILLED"))
+                    .filter(order -> order.getStatus() == OrderStatus.NEW ||
+                                   order.getStatus() == OrderStatus.PARTIALLY_FILLED)
                     .toList();
             currentOrders.addAll(userOrders);
         }
@@ -197,11 +200,7 @@ public class TradingService {
 
     public List<Order> getUserHistoryOrders(long userId, String symbol) {
         OrderBook orderBook = orderBookManager.getOrderBook(symbol);
-        return orderBook.getUserOrders(userId).stream()
-                .filter(order -> order.getStatus().name().equals("FILLED") ||
-                               order.getStatus().name().equals("CANCELLED") ||
-                               order.getStatus().name().equals("REJECTED"))
-                .toList();
+        return orderBook.getUserHistoricalOrders(userId);
     }
 
     public List<Order> getAllUserHistoryOrders(long userId) {
@@ -210,12 +209,8 @@ public class TradingService {
 
         for (String symbol : symbols) {
             OrderBook orderBook = orderBookManager.getOrderBook(symbol);
-            List<Order> userOrders = orderBook.getUserOrders(userId).stream()
-                    .filter(order -> order.getStatus().name().equals("FILLED") ||
-                                   order.getStatus().name().equals("CANCELLED") ||
-                                   order.getStatus().name().equals("REJECTED"))
-                    .toList();
-            historyOrders.addAll(userOrders);
+            List<Order> userHistoricalOrders = orderBook.getUserHistoricalOrders(userId);
+            historyOrders.addAll(userHistoricalOrders);
         }
 
         return historyOrders;
@@ -254,7 +249,7 @@ public class TradingService {
                                    BigDecimal price, BigDecimal quantity) {
         // For buy orders, check if user has enough quote currency (e.g., USDT for BTCUSDT)
         if (side == OrderSide.BUY) {
-            String quoteCurrency = extractQuoteCurrency(symbol);
+            String quoteCurrency = currencyUtils.extractQuoteCurrency(symbol);
             BigDecimal requiredAmount;
 
             if (orderType == OrderType.MARKET) {
@@ -279,7 +274,7 @@ public class TradingService {
         }
         // For sell orders, check if user has enough base currency (e.g., BTC for BTCUSDT)
         else if (side == OrderSide.SELL) {
-            String baseCurrency = extractBaseCurrency(symbol);
+            String baseCurrency = currencyUtils.extractBaseCurrency(symbol);
 
             if (!accountService.hasEnoughBalance(userId, baseCurrency, quantity)) {
                 throw new IllegalArgumentException(
@@ -290,28 +285,11 @@ public class TradingService {
         }
     }
 
-    private String extractBaseCurrency(String symbol) {
-        // For symbols like BTCUSDT, extract BTC
-        if (symbol.endsWith("USDT")) {
-            return symbol.substring(0, symbol.length() - 4);
-        }
-        // Add other quote currency patterns as needed
-        return symbol.substring(0, 3); // fallback
-    }
-
-    private String extractQuoteCurrency(String symbol) {
-        // For symbols like BTCUSDT, extract USDT
-        if (symbol.endsWith("USDT")) {
-            return "USDT";
-        }
-        // Add other quote currency patterns as needed
-        return "USDT"; // fallback
-    }
 
     private void freezeOrderFunds(String symbol, long userId, OrderSide side, OrderType orderType,
                                 BigDecimal price, BigDecimal quantity) {
         if (side == OrderSide.BUY) {
-            String quoteCurrency = extractQuoteCurrency(symbol);
+            String quoteCurrency = currencyUtils.extractQuoteCurrency(symbol);
             BigDecimal requiredAmount;
 
             if (orderType == OrderType.MARKET) {
@@ -337,7 +315,7 @@ public class TradingService {
                 userId, quoteCurrency, requiredAmount);
         }
         else if (side == OrderSide.SELL) {
-            String baseCurrency = extractBaseCurrency(symbol);
+            String baseCurrency = currencyUtils.extractBaseCurrency(symbol);
 
             boolean success = accountService.freezeBalance(userId, baseCurrency, quantity);
             if (!success) {
@@ -354,7 +332,7 @@ public class TradingService {
     private void unfreezeOrderFunds(String symbol, long userId, OrderSide side, OrderType orderType,
                                   BigDecimal price, BigDecimal quantity) {
         if (side == OrderSide.BUY) {
-            String quoteCurrency = extractQuoteCurrency(symbol);
+            String quoteCurrency = currencyUtils.extractQuoteCurrency(symbol);
             BigDecimal requiredAmount;
 
             if (orderType == OrderType.MARKET) {
@@ -374,7 +352,7 @@ public class TradingService {
                 userId, quoteCurrency, requiredAmount);
         }
         else if (side == OrderSide.SELL) {
-            String baseCurrency = extractBaseCurrency(symbol);
+            String baseCurrency = currencyUtils.extractBaseCurrency(symbol);
 
             accountService.unfreezeBalance(userId, baseCurrency, quantity);
             log.info("Unfrozen balance for sell order: userId={}, currency={}, amount={}",
