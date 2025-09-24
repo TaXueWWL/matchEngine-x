@@ -186,3 +186,127 @@ body {
     50% { background-color: #ffeaa7; }
     100% { background-color: transparent; }
 }
+
+/* Orderbook Styles */
+.orderbook-container {
+    font-size: 0.85rem;
+}
+
+.orderbook-levels {
+    max-height: 200px;
+    overflow-y: hidden;
+}
+
+.orderbook-level {
+    display: flex;
+    align-items: center;
+    padding: 2px 8px;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.orderbook-level:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.orderbook-level-background {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    opacity: 0.1;
+}
+
+.sell-level {
+    border-left: 2px solid transparent;
+}
+
+.sell-level:hover {
+    border-left-color: #dc3545;
+}
+
+.buy-level {
+    border-left: 2px solid transparent;
+}
+
+.buy-level:hover {
+    border-left-color: #28a745;
+}
+
+.sell-level .orderbook-level-background {
+    background-color: #dc3545;
+}
+
+.buy-level .orderbook-level-background {
+    background-color: #28a745;
+}
+
+.orderbook-price {
+    flex: 1;
+    text-align: left;
+    font-weight: 500;
+}
+
+.orderbook-size {
+    flex: 1;
+    text-align: center;
+}
+
+.orderbook-total {
+    flex: 1;
+    text-align: right;
+    font-size: 0.8rem;
+}
+
+.sell-price {
+    color: #dc3545 !important;
+}
+
+.buy-price {
+    color: #28a745 !important;
+}
+
+.current-price-section {
+    background: linear-gradient(90deg, rgba(40, 167, 69, 0.05) 0%, rgba(220, 53, 69, 0.05) 100%);
+}
+
+.current-price .price-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.price-change.positive {
+    color: #28a745 !important;
+}
+
+.price-change.negative {
+    color: #dc3545 !important;
+}
+
+/* Precision buttons */
+.btn-group .btn.active {
+    background-color: #007bff;
+    border-color: #007bff;
+    color: white;
+}
+
+/* K-Line Chart Styles */
+.kline-container {
+    position: relative;
+    background-color: #ffffff;
+    border-radius: 4px;
+}
+
+.kline-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+}
+
+#kline-chart {
+    border-radius: 4px;
+    overflow: hidden;
+}

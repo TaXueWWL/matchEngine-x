@@ -36,57 +36,61 @@
         <div class="col-lg-4">
             <!-- Order Book -->
             <div class="card mb-3">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h6 class="mb-0">
                         <i class="fas fa-list me-2"></i>
                         订单簿
                     </h6>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary active" data-precision="2">0.01</button>
+                        <button type="button" class="btn btn-outline-secondary" data-precision="1">0.1</button>
+                        <button type="button" class="btn btn-outline-secondary" data-precision="0">1</button>
+                    </div>
                 </div>
                 <div class="card-body p-0">
-                    <div class="order-book">
-                        <!-- Sell Orders (Asks) -->
-                        <div class="table-responsive">
-                            <table class="table table-sm mb-0">
-                                <thead>
-                                    <tr class="table-light">
-                                        <th>价格</th>
-                                        <th>数量</th>
-                                        <th>总额</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="sell-orders-body">
-                                    <!-- Sell orders will be populated here -->
-                                    <tr>
-                                        <td colspan="3" class="text-center text-muted">
-                                            <div class="spinner-border spinner-border-sm" role="status">
-                                                <span class="visually-hidden">Loading...</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                    <div class="orderbook-container">
+                        <!-- Header -->
+                        <div class="orderbook-header">
+                            <div class="row text-center small text-muted py-2 bg-light">
+                                <div class="col-4">价格(USDT)</div>
+                                <div class="col-4">数量(BTC)</div>
+                                <div class="col-4">累计(BTC)</div>
+                            </div>
                         </div>
 
-                        <!-- Current Price -->
-                        <div class="text-center py-2 bg-light">
-                            <strong class="text-primary" id="spread-price">¥50,000.00</strong>
-                            <small class="text-muted d-block">当前价格</small>
+                        <!-- Sell Orders (Asks) - Reversed order (lowest first) -->
+                        <div class="sell-orders-section">
+                            <div id="sell-orders-body" class="orderbook-levels">
+                                <div class="text-center text-muted py-3">
+                                    <div class="spinner-border spinner-border-sm" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <small class="d-block mt-1">加载中...</small>
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Buy Orders (Bids) -->
-                        <div class="table-responsive">
-                            <table class="table table-sm mb-0">
-                                <tbody id="buy-orders-body">
-                                    <!-- Buy orders will be populated here -->
-                                    <tr>
-                                        <td colspan="3" class="text-center text-muted">
-                                            <div class="spinner-border spinner-border-sm" role="status">
-                                                <span class="visually-hidden">Loading...</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        <!-- Current Price Spread -->
+                        <div class="current-price-section">
+                            <div class="text-center py-3 border-top border-bottom">
+                                <div class="current-price" id="current-price">
+                                    <span class="price-value text-success fw-bold" id="last-price">¥50,000.00</span>
+                                    <small class="price-change text-success ms-2" id="price-change">+2.5%</small>
+                                </div>
+                                <small class="text-muted d-block" id="price-label">≈ $50,000.00</small>
+                            </div>
+                        </div>
+
+                        <!-- Buy Orders (Bids) - Normal order (highest first) -->
+                        <div class="buy-orders-section">
+                            <div id="buy-orders-body" class="orderbook-levels">
+                                <div class="text-center text-muted py-3">
+                                    <div class="spinner-border spinner-border-sm" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <small class="d-block mt-1">加载中...</small>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -158,18 +162,31 @@
             </div>
         </div>
 
-        <!-- Middle Column: Price Chart -->
+        <!-- Middle Column: K-Line Chart -->
         <div class="col-lg-5">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h6 class="mb-0">
-                        <i class="fas fa-chart-area me-2"></i>
-                        价格图表
+                        <i class="fas fa-chart-candlestick me-2"></i>
+                        K线图
                     </h6>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary active" data-timeframe="1m">1分钟</button>
+                        <button type="button" class="btn btn-outline-secondary" data-timeframe="5m">5分钟</button>
+                        <button type="button" class="btn btn-outline-secondary" data-timeframe="15m">15分钟</button>
+                        <button type="button" class="btn btn-outline-secondary" data-timeframe="1h">1小时</button>
+                        <button type="button" class="btn btn-outline-secondary" data-timeframe="1d">1天</button>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div class="chart-container">
-                        <canvas id="price-chart"></canvas>
+                <div class="card-body p-2">
+                    <div class="kline-container" style="height: 400px; position: relative;">
+                        <div id="kline-chart" style="width: 100%; height: 100%;"></div>
+                        <div class="kline-loading text-center" id="kline-loading">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">加载K线数据...</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -203,80 +220,96 @@
                 </div>
             </div>
 
-            <!-- Recent Orders -->
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="mb-0">
-                        <i class="fas fa-history me-2"></i>
-                        最近订单
-                    </h6>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
-                        <table class="table table-sm mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>时间</th>
-                                    <th>类型</th>
-                                    <th>价格</th>
-                                    <th>状态</th>
-                                </tr>
-                            </thead>
-                            <tbody id="order-history-body">
-                                <tr>
-                                    <td colspan="4" class="text-center text-muted">
-                                        暂无订单记录
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
-    <!-- Current Orders Section -->
+    <!-- Orders Section -->
     <div class="row mt-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-list me-2"></i>
-                        当前订单
-                    </h5>
-                    <button class="btn btn-sm btn-outline-primary" onclick="loadCurrentOrders()">
+                    <ul class="nav nav-tabs card-header-tabs" id="orderTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="current-orders-tab" data-bs-toggle="tab"
+                                    data-bs-target="#current-orders" type="button" role="tab">
+                                <i class="fas fa-list me-1"></i>当前订单
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="order-history-tab" data-bs-toggle="tab"
+                                    data-bs-target="#order-history" type="button" role="tab">
+                                <i class="fas fa-history me-1"></i>历史订单
+                            </button>
+                        </li>
+                    </ul>
+                    <button class="btn btn-sm btn-outline-primary" onclick="refreshActiveTab()">
                         <i class="fas fa-refresh me-1"></i>刷新
                     </button>
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>订单ID</th>
-                                    <th>交易对</th>
-                                    <th>方向</th>
-                                    <th>类型</th>
-                                    <th>价格</th>
-                                    <th>数量</th>
-                                    <th>已成交</th>
-                                    <th>状态</th>
-                                    <th>时间</th>
-                                    <th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="current-orders-body">
-                                <tr>
-                                    <td colspan="10" class="text-center text-muted py-4">
-                                        <div class="spinner-border spinner-border-sm" role="status">
-                                            <span class="visually-hidden">Loading...</span>
-                                        </div>
-                                        <p class="mt-2 mb-0">正在加载当前订单...</p>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div class="tab-content" id="orderTabContent">
+                        <!-- Current Orders Tab -->
+                        <div class="tab-pane fade show active" id="current-orders" role="tabpanel">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>订单ID</th>
+                                            <th>交易对</th>
+                                            <th>方向</th>
+                                            <th>类型</th>
+                                            <th>价格</th>
+                                            <th>数量</th>
+                                            <th>已成交</th>
+                                            <th>状态</th>
+                                            <th>时间</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="current-orders-body">
+                                        <tr>
+                                            <td colspan="10" class="text-center text-muted py-4">
+                                                <div class="spinner-border spinner-border-sm" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <p class="mt-2 mb-0">正在加载当前订单...</p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Order History Tab -->
+                        <div class="tab-pane fade" id="order-history" role="tabpanel">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>订单ID</th>
+                                            <th>交易对</th>
+                                            <th>方向</th>
+                                            <th>类型</th>
+                                            <th>价格</th>
+                                            <th>数量</th>
+                                            <th>已成交</th>
+                                            <th>状态</th>
+                                            <th>时间</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="order-history-body">
+                                        <tr>
+                                            <td colspan="9" class="text-center text-muted py-4">
+                                                <div class="spinner-border spinner-border-sm" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <p class="mt-2 mb-0">正在加载历史订单...</p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -325,25 +358,6 @@
 <!-- Scripts Fragment -->
 <div th:fragment="scripts">
     <script>
-        // Trading page specific scripts
-        document.addEventListener('DOMContentLoaded', function() {
-            // Update total amount calculations
-            function updateTotal(side) {
-                const price = parseFloat(document.getElementById(side + '-price').value) || 0;
-                const quantity = parseFloat(document.getElementById(side + '-quantity').value) || 0;
-                const total = price * quantity;
-                document.getElementById(side + '-total').textContent = total.toFixed(2);
-            }
-
-            // Add event listeners for total calculations
-            ['buy-price', 'buy-quantity'].forEach(id => {
-                document.getElementById(id).addEventListener('input', () => updateTotal('buy'));
-            });
-
-            ['sell-price', 'sell-quantity'].forEach(id => {
-                document.getElementById(id).addEventListener('input', () => updateTotal('sell'));
-            });
-        });
     </script>
 </div>
 

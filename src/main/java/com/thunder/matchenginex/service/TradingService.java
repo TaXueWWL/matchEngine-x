@@ -169,6 +169,56 @@ public class TradingService {
         return allOrders;
     }
 
+    public List<Order> getUserCurrentOrders(long userId, String symbol) {
+        OrderBook orderBook = orderBookManager.getOrderBook(symbol);
+        return orderBook.getUserOrders(userId).stream()
+                .filter(order -> order.getStatus().name().equals("NEW") ||
+                               order.getStatus().name().equals("PARTIALLY_FILLED"))
+                .toList();
+    }
+
+    public List<Order> getAllUserCurrentOrders(long userId) {
+        List<Order> currentOrders = new ArrayList<>();
+        List<String> symbols = getSupportedSymbols();
+
+        for (String symbol : symbols) {
+            OrderBook orderBook = orderBookManager.getOrderBook(symbol);
+            List<Order> userOrders = orderBook.getUserOrders(userId).stream()
+                    .filter(order -> order.getStatus().name().equals("NEW") ||
+                                   order.getStatus().name().equals("PARTIALLY_FILLED"))
+                    .toList();
+            currentOrders.addAll(userOrders);
+        }
+
+        return currentOrders;
+    }
+
+    public List<Order> getUserHistoryOrders(long userId, String symbol) {
+        OrderBook orderBook = orderBookManager.getOrderBook(symbol);
+        return orderBook.getUserOrders(userId).stream()
+                .filter(order -> order.getStatus().name().equals("FILLED") ||
+                               order.getStatus().name().equals("CANCELLED") ||
+                               order.getStatus().name().equals("REJECTED"))
+                .toList();
+    }
+
+    public List<Order> getAllUserHistoryOrders(long userId) {
+        List<Order> historyOrders = new ArrayList<>();
+        List<String> symbols = getSupportedSymbols();
+
+        for (String symbol : symbols) {
+            OrderBook orderBook = orderBookManager.getOrderBook(symbol);
+            List<Order> userOrders = orderBook.getUserOrders(userId).stream()
+                    .filter(order -> order.getStatus().name().equals("FILLED") ||
+                                   order.getStatus().name().equals("CANCELLED") ||
+                                   order.getStatus().name().equals("REJECTED"))
+                    .toList();
+            historyOrders.addAll(userOrders);
+        }
+
+        return historyOrders;
+    }
+
     private void validateTradingPairConstraints(TradingPair tradingPair,
                                               BigDecimal price, BigDecimal quantity, OrderType orderType) {
         // Price constraints

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trading Test</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <h1>Trading Function Test</h1>
+
+    <form id="test-buy-form">
+        <input type="number" id="test-buy-price" placeholder="Price" value="49000" />
+        <input type="number" id="test-buy-quantity" placeholder="Quantity" value="0.001" />
+        <button type="submit">Buy</button>
+    </form>
+
+    <div id="result"></div>
+
+    <script>
+        console.log('Test page loaded');
+
+        document.getElementById('test-buy-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log('Form submitted');
+
+            const price = document.getElementById('test-buy-price').value;
+            const quantity = document.getElementById('test-buy-quantity').value;
+
+            console.log('Price:', price, 'Quantity:', quantity);
+
+            const order = {
+                userId: 1,
+                symbol: 'BTCUSDT',
+                side: 'BUY',
+                type: 'LIMIT',
+                price: parseFloat(price),
+                quantity: parseFloat(quantity)
+            };
+
+            console.log('Sending order:', order);
+
+            fetch('/api/trading/orders', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(order)
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Response data:', data);
+                document.getElementById('result').innerHTML = JSON.stringify(data);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('result').innerHTML = 'Error: ' + error.message;
+            });
+        });
+    </script>
+</body>
+</html>

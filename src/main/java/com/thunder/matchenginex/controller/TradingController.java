@@ -232,6 +232,54 @@ public class TradingController {
         }
     }
 
+    @GetMapping("/orders/user/{userId}/current")
+    public ResponseEntity<List<OrderDto>> getUserCurrentOrders(
+            @PathVariable Long userId,
+            @RequestParam(required = false) String symbol) {
+        try {
+            List<Order> orders;
+            if (symbol != null && !symbol.isEmpty()) {
+                orders = tradingService.getUserCurrentOrders(userId, symbol);
+            } else {
+                orders = tradingService.getAllUserCurrentOrders(userId);
+            }
+
+            List<OrderDto> orderDtos = orders.stream()
+                    .map(this::convertToOrderDto)
+                    .toList();
+
+            return ResponseEntity.ok(orderDtos);
+
+        } catch (Exception e) {
+            log.error("Error getting user current orders: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GetMapping("/orders/user/{userId}/history")
+    public ResponseEntity<List<OrderDto>> getUserHistoryOrders(
+            @PathVariable Long userId,
+            @RequestParam(required = false) String symbol) {
+        try {
+            List<Order> orders;
+            if (symbol != null && !symbol.isEmpty()) {
+                orders = tradingService.getUserHistoryOrders(userId, symbol);
+            } else {
+                orders = tradingService.getAllUserHistoryOrders(userId);
+            }
+
+            List<OrderDto> orderDtos = orders.stream()
+                    .map(this::convertToOrderDto)
+                    .toList();
+
+            return ResponseEntity.ok(orderDtos);
+
+        } catch (Exception e) {
+            log.error("Error getting user history orders: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     private OrderDto convertToOrderDto(Order order) {
         return OrderDto.builder()
                 .orderId(order.getOrderId())

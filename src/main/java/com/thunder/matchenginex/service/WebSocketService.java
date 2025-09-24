@@ -17,7 +17,7 @@ public class WebSocketService {
     public void broadcastOrderBookUpdate(String symbol, OrderBookResponse orderBook) {
         try {
             messagingTemplate.convertAndSend("/topic/orderbook/" + symbol, orderBook);
-            log.debug("Broadcasted order book update for symbol: {}", symbol);
+            log.info("Broadcasted order book update for symbol: {}", symbol);
         } catch (Exception e) {
             log.error("Error broadcasting order book update: {}", e.getMessage(), e);
         }
@@ -26,7 +26,7 @@ public class WebSocketService {
     public void broadcastTrade(String symbol, Trade trade) {
         try {
             messagingTemplate.convertAndSend("/topic/trades/" + symbol, trade);
-            log.debug("Broadcasted trade for symbol: {}", symbol);
+            log.info("Broadcasted trade for symbol: {}", symbol);
         } catch (Exception e) {
             log.error("Error broadcasting trade: {}", e.getMessage(), e);
         }
@@ -39,7 +39,7 @@ public class WebSocketService {
                 "/queue/notifications",
                 notification
             );
-            log.debug("Sent notification to user: {}", userId);
+            log.info("Sent notification to user: {}", userId);
         } catch (Exception e) {
             log.error("Error sending user notification: {}", e.getMessage(), e);
         }
