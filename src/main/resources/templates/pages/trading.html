@@ -30,8 +30,34 @@
     </div>
 
     <div class="row">
-        <!-- Left Column: Order Book and Recent Trades -->
+        <!-- Left Column: Account Balance, Order Book and Trading Forms -->
         <div class="col-lg-4">
+            <!-- User Balance -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-wallet me-2"></i>
+                        账户余额
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-12 mb-2">
+                            <div class="d-flex justify-content-between">
+                                <span>USDT:</span>
+                                <strong id="balance-USDT">Loading...</strong>
+                            </div>
+                        </div>
+                        <div class="col-12 mb-2">
+                            <div class="d-flex justify-content-between">
+                                <span th:text="${symbol != null ? symbol.substring(0, symbol.length() - 4) : 'BTC'}">BTC:</span>
+                                <strong id="balance-BTC">Loading...</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Order Book -->
             <div class="card mb-3">
                 <div class="card-header d-flex justify-content-between align-items-center">
@@ -49,7 +75,7 @@
                     <div class="orderbook-container">
                         <!-- Header -->
                         <div class="orderbook-header">
-                            <div class="row text-center small text-muted py-2 bg-light">
+                            <div class="row text-center small py-2">
                                 <div class="col-4">价格(USDT)</div>
                                 <div class="col-4">数量(BTC)</div>
                                 <div class="col-4">累计(BTC)</div>
@@ -74,7 +100,7 @@
                                 <div class="current-price" id="current-price">
                                     <span class="price-value text-success fw-bold" id="last-price">--</span>
                                     <small class="price-change text-success ms-2" id="price-change">+???%</small>
-                                    <small class="text-muted d-block" id="price-label">≈ $???</small>
+                                    <small class="text-muted text-success ms-2" id="price-label">≈ $???</small>
                                 </div>
                             </div>
                         </div>
@@ -160,8 +186,8 @@
             </div>
         </div>
 
-        <!-- Middle Column: K-Line Chart -->
-        <div class="col-lg-5">
+        <!-- Main Column: K-Line Chart -->
+        <div class="col-lg-8">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h6 class="mb-0">
@@ -180,7 +206,7 @@
                     </div>
                 </div>
                 <div class="card-body p-2">
-                    <div class="kline-container" style="height: 400px; position: relative;">
+                    <div class="kline-container" style="height: 600px; position: relative;">
                         <div id="kline-chart" style="width: 100%; height: 100%;"></div>
                         <div class="kline-loading text-center" id="kline-loading">
                             <div class="spinner-border" role="status">
@@ -193,35 +219,6 @@
             </div>
         </div>
 
-        <!-- Right Column: Order History and Balance -->
-        <div class="col-lg-3">
-            <!-- User Balance -->
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h6 class="mb-0">
-                        <i class="fas fa-wallet me-2"></i>
-                        账户余额
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-12 mb-2">
-                            <div class="d-flex justify-content-between">
-                                <span>USDT:</span>
-                                <strong id="balance-USDT">Loading...</strong>
-                            </div>
-                        </div>
-                        <div class="col-12 mb-2">
-                            <div class="d-flex justify-content-between">
-                                <span th:text="${symbol != null ? symbol.substring(0, symbol.length() - 4) : 'BTC'}">BTC:</span>
-                                <strong id="balance-BTC">Loading...</strong>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        </div>
     </div>
 
     <!-- Orders Section -->
@@ -251,9 +248,9 @@
                     <div class="tab-content" id="orderTabContent">
                         <!-- Current Orders Tab -->
                         <div class="tab-pane fade show active" id="current-orders" role="tabpanel">
-                            <div class="table-responsive">
-                                <table class="table table-hover mb-0">
-                                    <thead class="table-light">
+                            <div class="table-responsive orders-table-wrapper">
+                                <table class="table table-hover table-light mb-0">
+                                    <thead>
                                         <tr>
                                             <th>订单ID</th>
                                             <th>交易对</th>
@@ -283,9 +280,9 @@
 
                         <!-- Order History Tab -->
                         <div class="tab-pane fade" id="order-history" role="tabpanel">
-                            <div class="table-responsive">
-                                <table class="table table-hover mb-0">
-                                    <thead class="table-light">
+                            <div class="table-responsive orders-table-wrapper">
+                                <table class="table table-hover table-light mb-0">
+                                    <thead>
                                         <tr>
                                             <th>订单ID</th>
                                             <th>交易对</th>

@@ -1,50 +1,125 @@
-/* Trading Engine Custom Styles */
+/* Trading Engine Custom Styles - Bitget Dark Theme */
 
-/* Global styles */
+/* Global dark theme styles */
 body {
-    background-color: #f8f9fa;
+    background-color: #0B0E11;
+    color: #EAECEF;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .card {
-    border: none;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    background-color: #181A20;
+    border: 1px solid #2B2F36;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
     margin-bottom: 20px;
 }
 
 .card-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-radius: 10px 10px 0 0 !important;
+    background-color: #1E2026;
+    color: #EAECEF;
+    border-bottom: 1px solid #2B2F36;
+    border-radius: 8px 8px 0 0 !important;
+    padding: 12px 16px;
 }
 
-/* Trading interface styles */
+.card-body {
+    background-color: #181A20;
+    color: #EAECEF;
+}
+
+/* Navigation bar dark theme */
+.navbar-dark {
+    background-color: #1E2026 !important;
+    border-bottom: 1px solid #2B2F36;
+}
+
+.navbar-dark .navbar-brand,
+.navbar-dark .nav-link {
+    color: #EAECEF !important;
+}
+
+.navbar-dark .nav-link:hover {
+    color: #F0B90B !important;
+}
+
+.navbar-dark .nav-link.active {
+    color: #F0B90B !important;
+    font-weight: 500;
+}
+
+/* Trading interface dark styles */
 .order-book {
     max-height: 400px;
     overflow-y: auto;
+    background-color: #181A20;
 }
 
 .order-book table {
     font-size: 0.85rem;
+    color: #EAECEF;
+}
+
+.table-dark {
+    --bs-table-bg: #181A20;
+    --bs-table-border-color: #2B2F36;
 }
 
 .price-up {
-    color: #28a745;
+    color: #02C076;
 }
 
 .price-down {
-    color: #dc3545;
+    color: #F6465D;
 }
 
 .buy-order {
-    color: #28a745;
-    font-weight: bold;
+    color: #02C076;
+    font-weight: 500;
 }
 
 .sell-order {
-    color: #dc3545;
-    font-weight: bold;
+    color: #F6465D;
+    font-weight: 500;
+}
+
+/* Form controls dark theme */
+.form-control {
+    background-color: #2B2F36;
+    border: 1px solid #474D57;
+    color: #EAECEF;
+}
+
+.form-control:focus {
+    background-color: #2B2F36;
+    border-color: #F0B90B;
+    box-shadow: 0 0 0 0.2rem rgba(240, 185, 11, 0.25);
+    color: #EAECEF;
+}
+
+.form-control::placeholder {
+    color: #848E9C;
+}
+
+/* Button styles */
+.btn-success {
+    background-color: #02C076;
+    border-color: #02C076;
+}
+
+.btn-success:hover {
+    background-color: #019954;
+    border-color: #019954;
+}
+
+.btn-danger {
+    background-color: #F6465D;
+    border-color: #F6465D;
+}
+
+.btn-danger:hover {
+    background-color: #DC2C2C;
+    border-color: #DC2C2C;
 }
 
 /* Chart container */
@@ -121,20 +196,6 @@ body {
     font-weight: bold;
 }
 
-.status-filled {
-    background-color: #d4edda;
-    color: #155724;
-}
-
-.status-pending {
-    background-color: #fff3cd;
-    color: #856404;
-}
-
-.status-cancelled {
-    background-color: #f8d7da;
-    color: #721c24;
-}
 
 /* Loading spinner */
 .loading {
@@ -187,14 +248,21 @@ body {
     100% { background-color: transparent; }
 }
 
-/* Orderbook Styles */
+/* Orderbook dark theme styles */
 .orderbook-container {
     font-size: 0.85rem;
+    background-color: #181A20;
+}
+
+.orderbook-header {
+    background-color: #2B2F36;
+    color: #848E9C;
 }
 
 .orderbook-levels {
     max-height: 200px;
     overflow-y: hidden;
+    background-color: #181A20;
 }
 
 .orderbook-level {
@@ -204,10 +272,11 @@ body {
     position: relative;
     cursor: pointer;
     transition: background-color 0.2s;
+    color: #EAECEF;
 }
 
 .orderbook-level:hover {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: rgba(240, 185, 11, 0.1);
 }
 
 .orderbook-level-background {
@@ -215,7 +284,7 @@ body {
     top: 0;
     right: 0;
     height: 100%;
-    opacity: 0.1;
+    opacity: 0.15;
 }
 
 .sell-level {
@@ -223,7 +292,7 @@ body {
 }
 
 .sell-level:hover {
-    border-left-color: #dc3545;
+    border-left-color: #F6465D;
 }
 
 .buy-level {
@@ -231,15 +300,15 @@ body {
 }
 
 .buy-level:hover {
-    border-left-color: #28a745;
+    border-left-color: #02C076;
 }
 
 .sell-level .orderbook-level-background {
-    background-color: #dc3545;
+    background-color: #F6465D;
 }
 
 .buy-level .orderbook-level-background {
-    background-color: #28a745;
+    background-color: #02C076;
 }
 
 .orderbook-price {
@@ -251,51 +320,173 @@ body {
 .orderbook-size {
     flex: 1;
     text-align: center;
+    color: #EAECEF;
 }
 
 .orderbook-total {
     flex: 1;
     text-align: right;
     font-size: 0.8rem;
+    color: #848E9C;
 }
 
 .sell-price {
-    color: #dc3545 !important;
+    color: #F6465D !important;
 }
 
 .buy-price {
-    color: #28a745 !important;
+    color: #02C076 !important;
 }
 
 .current-price-section {
-    background: linear-gradient(90deg, rgba(40, 167, 69, 0.05) 0%, rgba(220, 53, 69, 0.05) 100%);
+    background-color: #1E2026;
+    border-top: 1px solid #2B2F36;
+    border-bottom: 1px solid #2B2F36;
 }
 
 .current-price .price-value {
     font-size: 1.1rem;
     font-weight: 600;
+    color: #EAECEF;
 }
 
 .price-change.positive {
-    color: #28a745 !important;
+    color: #02C076 !important;
 }
 
 .price-change.negative {
-    color: #dc3545 !important;
+    color: #F6465D !important;
 }
 
-/* Precision buttons */
-.btn-group .btn.active {
-    background-color: #007bff;
-    border-color: #007bff;
-    color: white;
+/* Table light theme for orders (with dark theme background) */
+.table-light {
+    --bs-table-bg: #F8F9FA;
+    --bs-table-color: #2C3E50;
+    --bs-table-border-color: #DEE2E6;
+    background-color: #F8F9FA;
+    color: #2C3E50;
+    border-radius: 8px;
+    overflow: hidden;
 }
 
-/* K-Line Chart Styles */
+.table-light th {
+    background-color: #E3F2FD;
+    color: #1565C0;
+    font-weight: 600;
+    border-color: #BBDEFB;
+}
+
+.table-light td {
+    background-color: #FAFAFA;
+    border-color: #E0E0E0;
+}
+
+.table-light tbody tr:nth-child(even) td {
+    background-color: #F5F5F5;
+}
+
+.table-hover.table-light > tbody > tr:hover > * {
+    --bs-table-accent-bg: rgba(21, 101, 192, 0.08);
+    background-color: rgba(227, 242, 253, 0.5);
+}
+
+/* Override text colors for light table content */
+.table-light .text-success {
+    color: #02C076 !important;
+    font-weight: 500;
+}
+
+.table-light .text-danger {
+    color: #F6465D !important;
+    font-weight: 500;
+}
+
+.table-light .order-status {
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.table-light .order-status.status-filled {
+    background-color: rgba(2, 192, 118, 0.15);
+    color: #02C076;
+}
+
+.table-light .order-status.status-pending {
+    background-color: rgba(240, 185, 11, 0.15);
+    color: #F0B90B;
+}
+
+.table-light .order-status.status-cancelled {
+    background-color: rgba(246, 70, 93, 0.15);
+    color: #F6465D;
+}
+
+/* Table responsive wrapper styling for light tables in dark theme */
+.orders-table-wrapper {
+    border-radius: 8px;
+    background-color: #F8F9FA;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid #DEE2E6;
+}
+
+/* Small text in light tables */
+.table-light small {
+    color: #6C757D;
+}
+
+/* Button styling within light tables */
+.table-light .btn-outline-warning {
+    color: #F0B90B;
+    border-color: #F0B90B;
+    background-color: transparent;
+}
+
+.table-light .btn-outline-warning:hover {
+    background-color: #F0B90B;
+    border-color: #F0B90B;
+    color: #0B0E11;
+}
+
+.table-light .btn-outline-danger {
+    color: #F6465D;
+    border-color: #F6465D;
+    background-color: transparent;
+}
+
+.table-light .btn-outline-danger:hover {
+    background-color: #F6465D;
+    border-color: #F6465D;
+    color: #FFFFFF;
+}
+
+/* Button group dark theme */
+.btn-outline-secondary {
+    color: #848E9C;
+    border-color: #474D57;
+    background-color: transparent;
+}
+
+.btn-outline-secondary:hover {
+    color: #EAECEF;
+    background-color: #474D57;
+    border-color: #474D57;
+}
+
+.btn-outline-secondary.active {
+    background-color: #F0B90B;
+    border-color: #F0B90B;
+    color: #0B0E11;
+    font-weight: 500;
+}
+
+/* K-Line Chart dark theme styles */
 .kline-container {
     position: relative;
-    background-color: #ffffff;
+    background-color: #181A20;
     border-radius: 4px;
+    border: 1px solid #2B2F36;
 }
 
 .kline-loading {
@@ -304,9 +495,265 @@ body {
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 10;
+    color: #EAECEF;
 }
 
 #kline-chart {
     border-radius: 4px;
     overflow: hidden;
+    background-color: #181A20;
+}
+
+/* Connection status dark theme */
+.connection-status {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 1000;
+}
+
+.connected {
+    background-color: #02C076;
+    color: white;
+}
+
+.disconnected {
+    background-color: #F6465D;
+    color: white;
+}
+
+/* Modal dark theme */
+.modal-content {
+    background-color: #181A20;
+    border: 1px solid #2B2F36;
+}
+
+.modal-header {
+    background-color: #1E2026;
+    border-bottom: 1px solid #2B2F36;
+    color: #EAECEF;
+}
+
+.modal-body {
+    background-color: #181A20;
+    color: #EAECEF;
+}
+
+.modal-footer {
+    background-color: #1E2026;
+    border-top: 1px solid #2B2F36;
+}
+
+.btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* Tab navigation dark theme */
+.nav-tabs {
+    border-bottom: 1px solid #2B2F36;
+}
+
+.nav-tabs .nav-link {
+    color: #848E9C;
+    background-color: transparent;
+    border-color: transparent;
+}
+
+.nav-tabs .nav-link:hover {
+    color: #EAECEF;
+    background-color: rgba(240, 185, 11, 0.1);
+    border-color: transparent;
+}
+
+.nav-tabs .nav-link.active {
+    color: #F0B90B;
+    background-color: #181A20;
+    border-color: #2B2F36 #2B2F36 #181A20;
+}
+
+/* Order status badges dark theme */
+.order-status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.status-filled {
+    background-color: rgba(2, 192, 118, 0.2);
+    color: #02C076;
+}
+
+.status-pending {
+    background-color: rgba(240, 185, 11, 0.2);
+    color: #F0B90B;
+}
+
+.status-cancelled {
+    background-color: rgba(246, 70, 93, 0.2);
+    color: #F6465D;
+}
+
+/* Text colors */
+.text-muted {
+    color: #848E9C !important;
+}
+
+/* Loading animation for dark theme */
+.spinner-border {
+    color: #F0B90B;
+}
+
+/* Small text adjustments */
+small {
+    color: #848E9C;
+}
+
+/* Override Bootstrap color classes for trading theme */
+.text-success {
+    color: #02C076 !important;
+}
+
+.text-danger {
+    color: #F6465D !important;
+}
+
+.bg-success {
+    background-color: #02C076 !important;
+}
+
+.bg-danger {
+    background-color: #F6465D !important;
+}
+
+.btn-success {
+    background-color: #02C076 !important;
+    border-color: #02C076 !important;
+}
+
+.btn-success:hover,
+.btn-success:focus {
+    background-color: #019954 !important;
+    border-color: #019954 !important;
+}
+
+.btn-danger {
+    background-color: #F6465D !important;
+    border-color: #F6465D !important;
+}
+
+.btn-danger:hover,
+.btn-danger:focus {
+    background-color: #DC2C2C !important;
+    border-color: #DC2C2C !important;
+}
+
+/* Override other Bootstrap color classes */
+.bg-primary {
+    background-color: #F0B90B !important;
+    color: #0B0E11 !important;
+}
+
+.bg-info {
+    background-color: #17a2b8 !important;
+    color: #EAECEF !important;
+}
+
+.bg-secondary {
+    background-color: #474D57 !important;
+    color: #EAECEF !important;
+}
+
+.text-primary {
+    color: #F0B90B !important;
+}
+
+.text-info {
+    color: #17a2b8 !important;
+}
+
+.text-secondary {
+    color: #848E9C !important;
+}
+
+/* Outline button variants for dark theme */
+.btn-outline-primary {
+    color: #F0B90B;
+    border-color: #F0B90B;
+}
+
+.btn-outline-primary:hover {
+    background-color: #F0B90B;
+    border-color: #F0B90B;
+    color: #0B0E11;
+}
+
+.btn-outline-danger {
+    color: #F6465D;
+    border-color: #F6465D;
+}
+
+.btn-outline-danger:hover {
+    background-color: #F6465D;
+    border-color: #F6465D;
+    color: #EAECEF;
+}
+
+/* Override badge colors */
+.badge {
+    color: #EAECEF;
+}
+
+.badge.bg-primary {
+    background-color: #F0B90B !important;
+    color: #0B0E11 !important;
+}
+
+.badge.bg-success {
+    background-color: #02C076 !important;
+    color: #EAECEF !important;
+}
+
+.badge.bg-danger {
+    background-color: #F6465D !important;
+    color: #EAECEF !important;
+}
+
+.badge.bg-info {
+    background-color: #17a2b8 !important;
+    color: #EAECEF !important;
+}
+
+.badge.bg-secondary {
+    background-color: #474D57 !important;
+    color: #EAECEF !important;
+}
+
+/* Override alert colors for dark theme */
+.alert {
+    border: none;
+}
+
+.alert-success {
+    background-color: rgba(2, 192, 118, 0.2);
+    border-left: 4px solid #02C076;
+    color: #02C076;
+}
+
+.alert-danger {
+    background-color: rgba(246, 70, 93, 0.2);
+    border-left: 4px solid #F6465D;
+    color: #F6465D;
+}
+
+.alert-warning {
+    background-color: rgba(240, 185, 11, 0.2);
+    border-left: 4px solid #F0B90B;
+    color: #F0B90B;
+}
+
+.alert-info {
+    background-color: rgba(23, 162, 184, 0.2);
+    border-left: 4px solid #17a2b8;
+    color: #17a2b8;
 }

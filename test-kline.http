@@ -1,0 +1,83 @@
+### Test K-line API endpoints
+
+# Get K-line data for BTCUSDT 1m timeframe
+GET http://localhost:8080/api/kline/BTCUSDT?timeframe=1m&limit=50
+Accept: application/json
+
+###
+
+# Get K-line data for BTCUSDT 1s timeframe
+GET http://localhost:8080/api/kline/BTCUSDT?timeframe=1s&limit=100
+Accept: application/json
+
+###
+
+# Get latest K-line for BTCUSDT 1m
+GET http://localhost:8080/api/kline/BTCUSDT/latest?timeframe=1m
+Accept: application/json
+
+###
+
+# Get supported timeframes
+GET http://localhost:8080/api/kline/timeframes
+Accept: application/json
+
+###
+
+# Test placing some orders to generate trades and K-line data
+POST http://localhost:8080/api/trading/place-order
+Content-Type: application/json
+
+{
+    "symbol": "BTCUSDT",
+    "side": "SELL",
+    "orderType": "LIMIT",
+    "price": 50000,
+    "quantity": 0.001
+}
+
+###
+
+POST http://localhost:8080/api/trading/place-order
+Content-Type: application/json
+
+{
+    "symbol": "BTCUSDT",
+    "side": "BUY",
+    "orderType": "LIMIT",
+    "price": 50000,
+    "quantity": 0.001
+}
+
+###
+
+# Place more orders at different prices to create K-line data
+POST http://localhost:8080/api/trading/place-order
+Content-Type: application/json
+
+{
+    "symbol": "BTCUSDT",
+    "side": "SELL",
+    "orderType": "LIMIT",
+    "price": 50100,
+    "quantity": 0.002
+}
+
+###
+
+POST http://localhost:8080/api/trading/place-order
+Content-Type: application/json
+
+{
+    "symbol": "BTCUSDT",
+    "side": "BUY",
+    "orderType": "LIMIT",
+    "price": 50100,
+    "quantity": 0.002
+}
+
+###
+
+# Check K-line data after trades
+GET http://localhost:8080/api/kline/BTCUSDT?timeframe=1s&limit=10
+Accept: application/json

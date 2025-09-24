@@ -44,42 +44,63 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // WebSocket connection
 function connectWebSocket() {
-    console.log('Connecting to WebSocket...');
+    console.log('🔌 Attempting WebSocket connection to /ws endpoint...');
+    console.log('🔍 Current URL:', window.location.href);
+    console.log('🔍 Base URL for WebSocket:', window.location.protocol + '//' + window.location.host);
 
     // Check if SockJS is available
     if (typeof SockJS === 'undefined') {
-        console.error('SockJS library not loaded');
+        console.error('❌ SockJS library not loaded');
         updateConnectionStatus(false);
         return;
     }
 
     // Check if Stomp is available
     if (typeof Stomp === 'undefined' && typeof StompJs === 'undefined') {
-        console.error('STOMP library not loaded');
+        console.error('❌ STOMP library not loaded');
         updateConnectionStatus(false);
         return;
     }
 
+    console.log('✅ WebSocket libraries loaded successfully');
+    console.log('🔍 SockJS version:', SockJS.version || 'unknown');
+    console.log('🔍 Stomp available:', typeof Stomp);
+    console.log('🔍 StompJs available:', typeof StompJs);
+
     try {
+        console.log('🔗 Creating SockJS socket...');
         const socket = new SockJS('/ws');
+        console.log('🔗 SockJS socket created:', socket);
 
         // Use Stomp.over if available (older API), otherwise use StompJs
         if (typeof Stomp !== 'undefined' && Stomp.over) {
+            console.log('🔗 Using legacy Stomp.js API');
             stompClient = Stomp.over(socket);
             stompClient.debug = function(str) {
-                console.log('STOMP: ' + str);
+                console.log('📡 STOMP: ' + str);
             };
 
             stompClient.connect({}, function(frame) {
-                console.log('WebSocket connected:', frame);
+                console.log('✅ WebSocket connected successfully:', frame);
+                console.log('🔍 Connection frame details:', {
+                    command: frame.command,
+                    headers: frame.headers,
+                    body: frame.body
+                });
                 updateConnectionStatus(true);
                 subscribeToUpdates();
             }, function(error) {
-                console.error('WebSocket connection error:', error);
+                console.error('❌ WebSocket connection error:', error);
+                console.error('🔍 Error details:', {
+                    message: error.message || error,
+                    stack: error.stack,
+                    type: typeof error
+                });
                 updateConnectionStatus(false);
             });
         } else {
             // Use newer StompJs API
+            console.log('🔗 Using newer StompJs API');
             stompClient = new StompJs.Client({
                 webSocketFactory: () => socket,
                 debug: function (str) {
@@ -97,16 +118,25 @@ function connectWebSocket() {
 
                 // Initialize or enable K-line chart with WebSocket connection - 使用WebSocket连接初始化或启用K线图
                 if (window.location.pathname === '/trading') {
+                    console.log('🔗 Trading page detected, setting up K-line WebSocket integration...');
                     setTimeout(() => {
+                        console.log('🔗 WebSocket delay completed, checking K-line chart status...');
+                        console.log('🔗 K-line chart exists:', !!klineChart);
+                        if (klineChart) {
+                            console.log('🔗 K-line chart methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(klineChart)));
+                        }
+
                         // Small delay to ensure WebSocket is fully established
                         if (klineChart && typeof klineChart.enableRealtimeUpdates === 'function') {
-                            console.log('Enabling real-time updates for existing K-line chart');
+                            console.log('🚀 Enabling real-time updates for existing K-line chart');
                             klineChart.enableRealtimeUpdates(stompClient);
                         } else {
-                            console.log('Initializing K-line chart after WebSocket connection');
+                            console.log('🚀 Initializing K-line chart after WebSocket connection');
                             initKLineChart();
                         }
                     }, 500);
+                } else {
+                    console.log('🔗 Not on trading page, skipping K-line WebSocket setup');
                 }
             };
 
@@ -603,7 +633,7 @@ function placeOrder(side) {
 }
 
 function initKLineChart() {
-    console.log('Initializing K-line chart with real-time data...');
+    console.log('Initializing K-line chart (historical data only, real-time updates will be enabled when WebSocket connects)...');
 
     try {
         // Try TradingView Lightweight Charts first
@@ -612,7 +642,7 @@ function initKLineChart() {
                 symbol: currentSymbol,
                 timeframe: '1m',
                 height: 400,
-                stompClient: stompClient
+                stompClient: null  // Start with null, enable real-time later
             });
 
             console.log('TradingView K-line chart initialized successfully');
@@ -629,7 +659,7 @@ function initKLineChart() {
                 klineChart = new FallbackKlineChart('kline-chart', {
                     symbol: currentSymbol,
                     timeframe: '1m',
-                    stompClient: stompClient
+                    stompClient: null  // Start with null, enable real-time later
                 });
 
                 console.log('Fallback K-line chart initialized successfully');
@@ -885,7 +915,7 @@ function updateCurrentOrders(orders) {
             <td>¥${parseFloat(order.price).toFixed(2)}</td>
             <td>${parseFloat(order.quantity).toFixed(6)}</td>
             <td>${parseFloat(order.filledQuantity).toFixed(6)}</td>
-            <td><span class="badge ${statusClass}">${statusText}</span></td>
+            <td><span class="${statusClass}">${statusText}</span></td>
             <td>${formatTimestamp(order.timestamp)}</td>
             <td>
                 <div class="btn-group btn-group-sm" role="group">
@@ -910,12 +940,12 @@ function updateCurrentOrders(orders) {
 
 function getStatusClass(status) {
     switch (status) {
-        case 'NEW': return 'bg-primary';
-        case 'PARTIALLY_FILLED': return 'bg-info';
-        case 'FILLED': return 'bg-success';
-        case 'CANCELLED': return 'bg-secondary';
-        case 'REJECTED': return 'bg-danger';
-        default: return 'bg-secondary';
+        case 'NEW': return 'order-status status-pending';
+        case 'PARTIALLY_FILLED': return 'order-status status-pending';
+        case 'FILLED': return 'order-status status-filled';
+        case 'CANCELLED': return 'order-status status-cancelled';
+        case 'REJECTED': return 'order-status status-cancelled';
+        default: return 'order-status status-cancelled';
     }
 }
 
@@ -965,7 +995,7 @@ function updateOrderHistory(orders) {
             <td>¥${parseFloat(order.price).toFixed(2)}</td>
             <td>${parseFloat(order.quantity).toFixed(6)}</td>
             <td>${parseFloat(order.filledQuantity).toFixed(6)}</td>
-            <td><span class="badge ${statusClass}">${statusText}</span></td>
+            <td><span class="${statusClass}">${statusText}</span></td>
             <td>${formatTimestamp(order.timestamp)}</td>
         `;
         tbody.appendChild(row);
@@ -1061,22 +1091,47 @@ function formatCurrency(amount, currency = '¥') {
 }
 
 function showModifyOrderDialog(orderId, symbol, currentPrice, currentQuantity) {
+    // 检查必需的元素是否存在
+    const orderIdElement = document.getElementById('modify-order-id');
+    const orderSymbolElement = document.getElementById('modify-order-symbol');
+    const orderPriceElement = document.getElementById('modify-order-price');
+    const orderQuantityElement = document.getElementById('modify-order-quantity');
+    const modalElement = document.getElementById('modifyOrderModal');
+
+    if (!orderIdElement || !orderSymbolElement || !orderPriceElement || !orderQuantityElement || !modalElement) {
+        console.error('Modify order dialog elements not found');
+        alert('修改订单对话框未加载，请刷新页面重试');
+        return;
+    }
+
     // 填充表单数据
-    document.getElementById('modify-order-id').value = orderId;
-    document.getElementById('modify-order-symbol').value = symbol;
-    document.getElementById('modify-order-price').value = currentPrice;
-    document.getElementById('modify-order-quantity').value = currentQuantity;
+    orderIdElement.value = orderId;
+    orderSymbolElement.value = symbol;
+    orderPriceElement.value = currentPrice;
+    orderQuantityElement.value = currentQuantity;
 
     // 显示对话框
-    const modal = new bootstrap.Modal(document.getElementById('modifyOrderModal'));
+    const modal = new bootstrap.Modal(modalElement);
     modal.show();
 }
 
 function submitModifyOrder() {
-    const orderId = document.getElementById('modify-order-id').value;
-    const symbol = document.getElementById('modify-order-symbol').value;
-    const newPrice = document.getElementById('modify-order-price').value;
-    const newQuantity = document.getElementById('modify-order-quantity').value;
+    // 检查必需的元素是否存在
+    const orderIdElement = document.getElementById('modify-order-id');
+    const orderSymbolElement = document.getElementById('modify-order-symbol');
+    const orderPriceElement = document.getElementById('modify-order-price');
+    const orderQuantityElement = document.getElementById('modify-order-quantity');
+
+    if (!orderIdElement || !orderSymbolElement || !orderPriceElement || !orderQuantityElement) {
+        console.error('Modify order dialog elements not found in submitModifyOrder');
+        alert('修改订单对话框元素未找到，请刷新页面重试');
+        return;
+    }
+
+    const orderId = orderIdElement.value;
+    const symbol = orderSymbolElement.value;
+    const newPrice = orderPriceElement.value;
+    const newQuantity = orderQuantityElement.value;
 
     if (!newPrice || !newQuantity) {
         alert('请填写新价格和新数量');
