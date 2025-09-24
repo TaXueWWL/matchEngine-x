@@ -110,13 +110,23 @@ class FallbackKlineChart {
     }
 
     async loadInitialData() {
+        console.log(`📊 [FALLBACK] Loading initial K-line data for ${this.symbol}/${this.timeframe}...`);
+
         try {
             const response = await fetch(`/api/kline/${this.symbol}?timeframe=${this.timeframe}&limit=50`);
+            console.log(`📡 [FALLBACK] K-line API response status:`, response.status);
+
             if (!response.ok) {
-                throw new Error('Failed to fetch initial K-line data');
+                throw new Error(`Failed to fetch initial K-line data: ${response.status} ${response.statusText}`);
             }
 
             const klines = await response.json();
+            console.log(`📈 [FALLBACK] Received K-line data:`, {
+                count: klines ? klines.length : 0,
+                firstData: klines && klines.length > 0 ? klines[0] : null,
+                lastData: klines && klines.length > 0 ? klines[klines.length - 1] : null
+            });
+
             if (klines && klines.length > 0) {
                 const labels = klines.map(k => new Date(k.timestamp * 1000));
                 const prices = klines.map(k => parseFloat(k.close));
@@ -125,7 +135,9 @@ class FallbackKlineChart {
                 this.chart.data.datasets[0].data = prices;
                 this.chart.update();
 
-                console.log(`Loaded ${klines.length} K-line data points (fallback)`);
+                console.log(`✅ [FALLBACK] Loaded ${klines.length} K-line data points successfully`);
+            } else {
+                console.log('⚠️ [FALLBACK] No initial K-line data available');
             }
 
         } catch (error) {

@@ -126,13 +126,12 @@ function connectWebSocket() {
                             console.log('🔗 K-line chart methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(klineChart)));
                         }
 
-                        // Small delay to ensure WebSocket is fully established
+                        // Enable real-time updates for existing K-line chart
                         if (klineChart && typeof klineChart.enableRealtimeUpdates === 'function') {
                             console.log('🚀 Enabling real-time updates for existing K-line chart');
                             klineChart.enableRealtimeUpdates(stompClient);
                         } else {
-                            console.log('🚀 Initializing K-line chart after WebSocket connection');
-                            initKLineChart();
+                            console.log('⚠️ K-line chart not found or method not available, chart should have been initialized on page load');
                         }
                     }, 500);
                 } else {

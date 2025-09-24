@@ -130,15 +130,31 @@ class KlineChart {
      * Load initial K-line data - 加载初始K线数据
      */
     async loadInitialData() {
+        console.log(`📊 Loading initial K-line data for ${this.symbol}/${this.timeframe}...`);
+
         try {
             const response = await fetch(`/api/kline/${this.symbol}?timeframe=${this.timeframe}&limit=100`);
+            console.log(`📡 K-line API response status:`, response.status);
+
             if (!response.ok) {
-                throw new Error('Failed to fetch initial K-line data');
+                throw new Error(`Failed to fetch initial K-line data: ${response.status} ${response.statusText}`);
             }
 
             const klines = await response.json();
+            console.log(`📈 Received K-line data:`, {
+                count: klines ? klines.length : 0,
+                firstData: klines && klines.length > 0 ? klines[0] : null,
+                lastData: klines && klines.length > 0 ? klines[klines.length - 1] : null
+            });
+
             if (klines && klines.length > 0 && this.candlestickSeries) {
                 const candleData = this.transformKlineData(klines);
+                console.log(`🔄 Transformed candle data:`, {
+                    count: candleData.length,
+                    firstCandle: candleData[0],
+                    lastCandle: candleData[candleData.length - 1]
+                });
+
                 this.candlestickSeries.setData(candleData);
 
                 // Auto-fit visible range - 自动适应可见范围
@@ -146,15 +162,16 @@ class KlineChart {
                     this.chart.timeScale().fitContent();
                 }
 
-                console.log(`Loaded ${klines.length} initial K-line data points`);
+                console.log(`✅ Loaded ${klines.length} initial K-line data points successfully`);
+                this.hideLoading();
             } else {
-                console.log('No initial K-line data available');
+                console.log('⚠️ No initial K-line data available');
                 this.showNoData();
             }
 
         } catch (error) {
-            console.error('Error loading initial K-line data:', error);
-            this.showError('加载K线数据失败');
+            console.error('❌ Error loading initial K-line data:', error);
+            this.showError('加载K线数据失败: ' + error.message);
         }
     }
 
@@ -268,13 +285,24 @@ class KlineChart {
      * Transform K-line data to chart format - 将K线数据转换为图表格式
      */
     transformKlineData(klines) {
-        return klines.map(kline => ({
-            time: kline.timestamp,
-            open: parseFloat(kline.open),
-            high: parseFloat(kline.high),
-            low: parseFloat(kline.low),
-            close: parseFloat(kline.close),
-        }));
+        return klines.map(kline => {
+            const transformedData = {
+                time: kline.timestamp,
+                open: parseFloat(kline.open) || 0,
+                high: parseFloat(kline.high) || 0,
+                low: parseFloat(kline.low) || 0,
+                close: parseFloat(kline.close) || 0,
+            };
+
+            // 验证数据有效性
+            if (transformedData.high < transformedData.low) {
+                console.warn('⚠️ Invalid K-line data: high < low', kline);
+                transformedData.high = Math.max(transformedData.open, transformedData.close);
+                transformedData.low = Math.min(transformedData.open, transformedData.close);
+            }
+
+            return transformedData;
+        }).filter(data => data.time > 0); // 过滤掉无效时间戳的数据
     }
 
     /**
@@ -428,6 +456,16 @@ class KlineChart {
     }
 
     /**
+     * Hide loading indicator - 隐藏加载指示器
+     */
+    hideLoading() {
+        const loadingElement = this.container.querySelector('#kline-loading');
+        if (loadingElement) {
+            loadingElement.style.display = 'none';
+        }
+    }
+
+    /**
      * Generate unique session ID - 生成唯一会话ID
      */
     generateSessionId() {
@@ -442,15 +480,38 @@ class KlineChart {
             symbol: this.symbol,
             timeframe: this.timeframe,
             hasStompClient: !!stompClient,
-            isConnected: stompClient && stompClient.connected
+            isConnected: stompClient && stompClient.connected,
+            stompState: stompClient && stompClient.state,
+            connectionDetails: stompClient ? {
+                connected: stompClient.connected,
+                state: stompClient.state
+            } : null
         });
 
-        if (stompClient && stompClient.connected) {
+        // Check connection with both legacy and new API compatibility
+        const isConnected = stompClient && (
+            stompClient.connected ||
+            (stompClient.state && stompClient.state === 'CONNECTED')
+        );
+
+        if (stompClient && isConnected) {
             this.stompClient = stompClient;
+            console.log('🔔 Starting K-line WebSocket subscription...');
             this.subscribeToUpdates();
+
+            // 强制重新加载数据以确保与WebSocket推送同步
+            console.log('🔄 Refreshing K-line data to sync with WebSocket...');
+            setTimeout(() => {
+                this.loadInitialData();
+            }, 1000);
+
             console.log('✅ Real-time updates enabled for K-line chart');
         } else {
-            console.warn('⚠️ Cannot enable real-time updates: WebSocket not connected');
+            console.warn('⚠️ Cannot enable real-time updates: WebSocket not connected', {
+                hasClient: !!stompClient,
+                connected: stompClient && stompClient.connected,
+                state: stompClient && stompClient.state
+            });
         }
     }
 

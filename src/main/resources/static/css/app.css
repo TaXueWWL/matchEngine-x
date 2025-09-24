@@ -1,49 +1,97 @@
-/* Trading Engine Custom Styles - Bitget Dark Theme */
+/* Trading Engine Custom Styles - Theme Support */
 
-/* Global dark theme styles */
+/* Global light theme styles (default) */
 body {
-    background-color: #0B0E11;
-    color: #EAECEF;
+    background-color: #f8f9fa;
+    color: #2c3e50;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* Global dark theme styles */
+body.dark-theme {
+    background-color: #0B0E11;
+    color: #EAECEF;
+}
+
+/* Card styles - Light theme */
 .card {
-    background-color: #181A20;
-    border: 1px solid #2B2F36;
+    background-color: #ffffff;
+    border: 1px solid #dee2e6;
     border-radius: 8px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     margin-bottom: 20px;
+    transition: all 0.3s ease;
 }
 
 .card-header {
-    background-color: #1E2026;
-    color: #EAECEF;
-    border-bottom: 1px solid #2B2F36;
+    background-color: #f8f9fa;
+    color: #2c3e50;
+    border-bottom: 1px solid #dee2e6;
     border-radius: 8px 8px 0 0 !important;
     padding: 12px 16px;
 }
 
 .card-body {
+    background-color: #ffffff;
+    color: #2c3e50;
+}
+
+/* Card styles - Dark theme */
+body.dark-theme .card {
+    background-color: #181A20;
+    border: 1px solid #2B2F36;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-theme .card-header {
+    background-color: #1E2026;
+    color: #EAECEF;
+    border-bottom: 1px solid #2B2F36;
+}
+
+body.dark-theme .card-body {
     background-color: #181A20;
     color: #EAECEF;
 }
 
-/* Navigation bar dark theme */
-.navbar-dark {
+/* Navigation bar - Light theme */
+.navbar {
+    background-color: #ffffff !important;
+    border-bottom: 1px solid #dee2e6;
+    transition: all 0.3s ease;
+}
+
+.navbar .navbar-brand,
+.navbar .nav-link {
+    color: #2c3e50 !important;
+}
+
+.navbar .nav-link:hover {
+    color: #007bff !important;
+}
+
+.navbar .nav-link.active {
+    color: #007bff !important;
+    font-weight: 500;
+}
+
+/* Navigation bar - Dark theme */
+body.dark-theme .navbar {
     background-color: #1E2026 !important;
     border-bottom: 1px solid #2B2F36;
 }
 
-.navbar-dark .navbar-brand,
-.navbar-dark .nav-link {
+body.dark-theme .navbar .navbar-brand,
+body.dark-theme .navbar .nav-link {
     color: #EAECEF !important;
 }
 
-.navbar-dark .nav-link:hover {
+body.dark-theme .navbar .nav-link:hover {
     color: #F0B90B !important;
 }
 
-.navbar-dark .nav-link.active {
+body.dark-theme .navbar .nav-link.active {
     color: #F0B90B !important;
     font-weight: 500;
 }
@@ -358,7 +406,7 @@ body {
     color: #F6465D !important;
 }
 
-/* Table light theme for orders (with dark theme background) */
+/* Table styles - Light theme */
 .table-light {
     --bs-table-bg: #F8F9FA;
     --bs-table-color: #2C3E50;
@@ -367,6 +415,7 @@ body {
     color: #2C3E50;
     border-radius: 8px;
     overflow: hidden;
+    transition: all 0.3s ease;
 }
 
 .table-light th {
@@ -388,6 +437,35 @@ body {
 .table-hover.table-light > tbody > tr:hover > * {
     --bs-table-accent-bg: rgba(21, 101, 192, 0.08);
     background-color: rgba(227, 242, 253, 0.5);
+}
+
+/* Table styles - Dark theme override */
+body.dark-theme .table-light {
+    --bs-table-bg: #181A20;
+    --bs-table-color: #EAECEF;
+    --bs-table-border-color: #2B2F36;
+    background-color: #181A20;
+    color: #EAECEF;
+}
+
+body.dark-theme .table-light th {
+    background-color: #1E2026;
+    color: #F0B90B;
+    border-color: #2B2F36;
+}
+
+body.dark-theme .table-light td {
+    background-color: #181A20;
+    border-color: #2B2F36;
+}
+
+body.dark-theme .table-light tbody tr:nth-child(even) td {
+    background-color: #1C1E24;
+}
+
+body.dark-theme .table-hover.table-light > tbody > tr:hover > * {
+    --bs-table-accent-bg: rgba(240, 185, 11, 0.1);
+    background-color: rgba(240, 185, 11, 0.1);
 }
 
 /* Override text colors for light table content */
@@ -423,12 +501,20 @@ body {
     color: #F6465D;
 }
 
-/* Table responsive wrapper styling for light tables in dark theme */
+/* Table responsive wrapper styling - Light theme */
 .orders-table-wrapper {
     border-radius: 8px;
     background-color: #F8F9FA;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     border: 1px solid #DEE2E6;
+    transition: all 0.3s ease;
+}
+
+/* Table responsive wrapper styling - Dark theme */
+body.dark-theme .orders-table-wrapper {
+    background-color: #181A20;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    border: 1px solid #2B2F36;
 }
 
 /* Small text in light tables */

@@ -232,7 +232,7 @@ public class KlineWebSocketController {
         // Align timestamp to timeframe boundaries
         long alignedTimestamp = alignTimestampToTimeframe(currentTime, timeframe);
 
-        log.debug("Creating empty K-line for {} {} at timestamp {}", symbol, timeframe, alignedTimestamp);
+//        log.debug("Creating empty K-line for {} {} at timestamp {}", symbol, timeframe, alignedTimestamp);
 
         return Kline.builder()
                 .symbol(symbol)
