@@ -1,0 +1,53 @@
+server:
+  port: 8080
+
+grpc:
+  server:
+    port: 9090
+
+spring:
+  application:
+    name: matchEngine-x
+
+logging:
+  level:
+    com.thunder.matchenginex: DEBUG
+    com.lmax.disruptor: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+trading:
+  pairs:
+    BTCUSDT:
+      symbol: BTCUSDT
+      baseAsset: BTC
+      quoteAsset: USDT
+      minPrice: 0.01
+      maxPrice: 1000000.00
+      priceStep: 0.01
+      minQuantity: 0.00001
+      maxQuantity: 1000.00
+      quantityStep: 0.00001
+      enabled: true
+    ETHUSDT:
+      symbol: ETHUSDT
+      baseAsset: ETH
+      quoteAsset: USDT
+      minPrice: 0.01
+      maxPrice: 100000.00
+      priceStep: 0.01
+      minQuantity: 0.0001
+      maxQuantity: 10000.00
+      quantityStep: 0.0001
+      enabled: true
+    ADAUSDT:
+      symbol: ADAUSDT
+      baseAsset: ADA
+      quoteAsset: USDT
+      minPrice: 0.0001
+      maxPrice: 100.00
+      priceStep: 0.0001
+      minQuantity: 1.00
+      maxQuantity: 1000000.00
+      quantityStep: 1.00
+      enabled: true

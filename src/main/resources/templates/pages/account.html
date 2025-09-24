@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<!-- Content Fragment -->
+<div th:fragment="content">
+    <!-- Connection Status -->
+    <div class="connection-status">
+        <span id="connection-status" class="badge disconnected">未连接</span>
+    </div>
+
+    <!-- Account Overview -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0">
+                        <i class="fas fa-user-circle me-2"></i>
+                        账户管理
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>账户信息</h5>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>用户ID:</strong></td>
+                                    <td id="user-id-display" th:text="${session.userId}">1</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>账户状态:</strong></td>
+                                    <td><span class="badge bg-success">正常</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>注册时间:</strong></td>
+                                    <td>2024-01-01</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-center">
+                                <i class="fas fa-user-check fa-5x text-success mb-3"></i>
+                                <h5>账户验证完成</h5>
+                                <p class="text-muted">您的账户已通过验证，可以正常交易</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Left Column: Balance Management -->
+        <div class="col-lg-6">
+            <!-- Current Balances -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-coins me-2"></i>
+                        账户余额
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="balance-card rounded p-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-dollar-sign fa-2x me-3"></i>
+                                    <div class="text-white">
+                                        <h6>USDT</h6>
+                                        <p class="balance-amount mb-0" id="balance-USDT">Loading...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="balance-card rounded p-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="fab fa-bitcoin fa-2x me-3"></i>
+                                    <div class="text-white">
+                                        <h6>BTC</h6>
+                                        <p class="balance-amount mb-0" id="balance-BTC">Loading...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="balance-card rounded p-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="fab fa-ethereum fa-2x me-3"></i>
+                                    <div class="text-white">
+                                        <h6>ETH</h6>
+                                        <p class="balance-amount mb-0" id="balance-ETH">Loading...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="balance-card rounded p-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-coins fa-2x me-3"></i>
+                                    <div class="text-white">
+                                        <h6>ADA</h6>
+                                        <p class="balance-amount mb-0" id="balance-ADA">Loading...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Balance -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-plus-circle me-2"></i>
+                        添加余额
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="add-balance-form" onsubmit="addBalance(); return false;">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="add-currency" class="form-label">选择币种</label>
+                                <select class="form-select" id="add-currency" required>
+                                    <option value="">请选择币种</option>
+                                    <option value="USDT">USDT</option>
+                                    <option value="BTC">BTC</option>
+                                    <option value="ETH">ETH</option>
+                                    <option value="ADA">ADA</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="add-amount" class="form-label">添加金额</label>
+                                <input type="number" class="form-control" id="add-amount"
+                                       step="0.001" min="0" placeholder="0.000" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>添加余额
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Order History -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history me-2"></i>
+                        交易历史
+                    </h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadOrderHistory()">
+                        <i class="fas fa-refresh me-1"></i>刷新
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                        <table class="table table-hover order-history-table mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>时间</th>
+                                    <th>交易对</th>
+                                    <th>类型</th>
+                                    <th>价格</th>
+                                    <th>数量</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="order-history-body">
+                                <!-- Order history will be populated here -->
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">
+                                        <div class="spinner-border spinner-border-sm" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2 mb-0">正在加载交易记录...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Section -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>
+                        交易统计
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center">
+                            <i class="fas fa-chart-line fa-3x text-primary mb-2"></i>
+                            <h6>总交易次数</h6>
+                            <h4 class="text-primary" id="total-trades">0</h4>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <i class="fas fa-coins fa-3x text-success mb-2"></i>
+                            <h6>总交易量</h6>
+                            <h4 class="text-success" id="total-volume">¥0.00</h4>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <i class="fas fa-trophy fa-3x text-warning mb-2"></i>
+                            <h6>盈利订单</h6>
+                            <h4 class="text-warning" id="profit-orders">0</h4>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <i class="fas fa-percent fa-3x text-info mb-2"></i>
+                            <h6>成功率</h6>
+                            <h4 class="text-info" id="success-rate">0%</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts Fragment -->
+<div th:fragment="scripts">
+    <script>
+        // Account page specific scripts
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get current user ID from the page
+            const userIdElement = document.getElementById('currentUserId');
+            const currentUserId = userIdElement ? parseInt(userIdElement.textContent) : 1;
+
+            // Load balances for different currencies
+            fetch('/api/trading-pairs/currencies')
+                .then(response => response.json())
+                .then(currencies => {
+                    currencies.forEach(currency => {
+                        loadCurrencyBalance(currency, currentUserId);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading supported currencies:', error);
+                    // Fallback to default currencies if API fails
+                    const defaultCurrencies = ['USDT', 'BTC', 'ETH', 'ADA'];
+                    defaultCurrencies.forEach(currency => {
+                        loadCurrencyBalance(currency, currentUserId);
+                    });
+                });
+
+            // Update statistics with mock data
+            setTimeout(() => {
+                document.getElementById('total-trades').textContent = '156';
+                document.getElementById('total-volume').textContent = '¥123,456.78';
+                document.getElementById('profit-orders').textContent = '98';
+                document.getElementById('success-rate').textContent = '62.8%';
+            }, 1000);
+        });
+
+        function loadCurrencyBalance(currency, userId) {
+            fetch(`/api/account/balance/${userId}?currency=${currency}`)
+                .then(response => response.json())
+                .then(data => {
+                    const balanceElement = document.getElementById(`balance-${currency}`);
+                    if (balanceElement) {
+                        // Format the balance nicely
+                        const balance = data.availableBalance || 0;
+                        const formattedBalance = currency === 'USDT' ?
+                            balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) :
+                            balance.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 8 });
+                        balanceElement.textContent = formattedBalance;
+
+                        // Add flash effect to indicate update
+                        balanceElement.classList.add('flash-update');
+                        setTimeout(() => {
+                            balanceElement.classList.remove('flash-update');
+                        }, 500);
+                    }
+                })
+                .catch(error => {
+                    console.error(`Error loading ${currency} balance:`, error);
+                    const balanceElement = document.getElementById(`balance-${currency}`);
+                    if (balanceElement) {
+                        balanceElement.textContent = currency === 'USDT' ? '0.00' : '0.00000000';
+                    }
+                });
+        }
+    </script>
+</div>
+
+</html>

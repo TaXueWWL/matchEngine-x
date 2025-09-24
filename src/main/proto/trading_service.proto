@@ -1,0 +1,140 @@
+syntax = "proto3";
+
+package com.thunder.matchenginex.grpc;
+
+option java_package = "com.thunder.matchenginex.grpc";
+option java_outer_classname = "TradingServiceProto";
+
+// Trading Service
+service TradingService {
+    // Place a new order
+    rpc PlaceOrder (PlaceOrderRequest) returns (PlaceOrderResponse);
+
+    // Cancel an existing order
+    rpc CancelOrder (CancelOrderRequest) returns (CancelOrderResponse);
+
+    // Modify an existing order
+    rpc ModifyOrder (ModifyOrderRequest) returns (ModifyOrderResponse);
+
+    // Query order details
+    rpc QueryOrder (QueryOrderRequest) returns (QueryOrderResponse);
+
+    // Query order book
+    rpc QueryOrderBook (QueryOrderBookRequest) returns (QueryOrderBookResponse);
+}
+
+// Enums
+enum OrderSide {
+    BUY = 0;
+    SELL = 1;
+}
+
+enum OrderType {
+    LIMIT = 0;
+    MARKET = 1;
+    IOC = 2;
+    FOK = 3;
+    POST_ONLY = 4;
+}
+
+enum OrderStatus {
+    NEW = 0;
+    PARTIALLY_FILLED = 1;
+    FILLED = 2;
+    CANCELLED = 3;
+    REJECTED = 4;
+}
+
+// Messages
+message PlaceOrderRequest {
+    string symbol = 1;
+    int64 user_id = 2;
+    OrderSide side = 3;
+    OrderType type = 4;
+    string price = 5;  // Use string for decimal precision
+    string quantity = 6;
+}
+
+message PlaceOrderResponse {
+    int64 order_id = 1;
+    bool success = 2;
+    string message = 3;
+}
+
+message CancelOrderRequest {
+    int64 order_id = 1;
+    string symbol = 2;
+    int64 user_id = 3;
+}
+
+message CancelOrderResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message ModifyOrderRequest {
+    int64 order_id = 1;
+    string symbol = 2;
+    int64 user_id = 3;
+    string new_price = 4;
+    string new_quantity = 5;
+}
+
+message ModifyOrderResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message QueryOrderRequest {
+    int64 order_id = 1;
+    string symbol = 2;
+}
+
+message QueryOrderResponse {
+    Order order = 1;
+    bool found = 2;
+}
+
+message QueryOrderBookRequest {
+    string symbol = 1;
+    int32 depth = 2;  // Number of price levels to return
+}
+
+message QueryOrderBookResponse {
+    string symbol = 1;
+    repeated PriceLevel buy_levels = 2;
+    repeated PriceLevel sell_levels = 3;
+}
+
+message Order {
+    int64 order_id = 1;
+    string symbol = 2;
+    int64 user_id = 3;
+    OrderSide side = 4;
+    OrderType type = 5;
+    string price = 6;
+    string quantity = 7;
+    string filled_quantity = 8;
+    string remaining_quantity = 9;
+    OrderStatus status = 10;
+    int64 timestamp = 11;
+    int64 sequence = 12;
+}
+
+message PriceLevel {
+    string price = 1;
+    string total_quantity = 2;
+    int32 order_count = 3;
+}
+
+message Trade {
+    int64 trade_id = 1;
+    string symbol = 2;
+    int64 buy_order_id = 3;
+    int64 sell_order_id = 4;
+    int64 buy_user_id = 5;
+    int64 sell_user_id = 6;
+    string price = 7;
+    string quantity = 8;
+    int64 timestamp = 9;
+}

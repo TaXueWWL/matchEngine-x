@@ -1,0 +1,61 @@
+package com.thunder.matchenginex.service;
+
+import com.thunder.matchenginex.model.Account;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+@Slf4j
+@Service
+public class AccountService {
+
+    private final ConcurrentMap<Long, Account> accounts = new ConcurrentHashMap<>();
+
+    public Account getAccount(Long userId) {
+        return accounts.computeIfAbsent(userId, id ->
+            Account.builder().userId(id).build()
+        );
+    }
+
+    public boolean addBalance(Long userId, String currency, BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Amount must be positive");
+        }
+
+        Account account = getAccount(userId);
+        account.addBalance(currency, amount);
+        log.info("Added balance: userId={}, currency={}, amount={} available={}", userId, currency, amount, account.getTotalBalance(currency));
+        return true;
+    }
+
+    public boolean hasEnoughBalance(Long userId, String currency, BigDecimal amount) {
+        Account account = getAccount(userId);
+        return account.getAvailableBalance(currency).compareTo(amount) >= 0;
+    }
+
+    public boolean freezeBalance(Long userId, String currency, BigDecimal amount) {
+        Account account = getAccount(userId);
+        boolean success = account.freezeAmount(currency, amount);
+        if (success) {
+            log.info("Frozen balance: userId={}, currency={}, amount={}", userId, currency, amount);
+        }
+        return success;
+    }
+
+    public void unfreezeBalance(Long userId, String currency, BigDecimal amount) {
+        Account account = getAccount(userId);
+        account.unfreezeAmount(currency, amount);
+        log.info("Unfrozen balance: userId={}, currency={}, amount={}", userId, currency, amount);
+    }
+
+    public BigDecimal getAvailableBalance(Long userId, String currency) {
+        return getAccount(userId).getAvailableBalance(currency);
+    }
+
+    public BigDecimal getTotalBalance(Long userId, String currency) {
+        return getAccount(userId).getTotalBalance(currency);
+    }
+}

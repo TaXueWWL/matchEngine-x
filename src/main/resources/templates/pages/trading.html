@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<!-- Content Fragment -->
+<div th:fragment="content">
+    <!-- Connection Status -->
+    <div class="connection-status">
+        <span id="connection-status" class="badge disconnected">未连接</span>
+    </div>
+
+    <!-- Trading Pair Header -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">
+                                <i class="fas fa-exchange-alt me-2"></i>
+                                <span id="current-symbol" th:text="${symbol}">BTCUSDT</span>
+                            </h4>
+                            <small class="text-muted">当前交易对</small>
+                        </div>
+                        <div class="text-end">
+                            <h5 class="mb-0 text-success" id="current-price">¥50,000.00</h5>
+                            <small class="text-success">+2.5%</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Left Column: Order Book and Recent Trades -->
+        <div class="col-lg-4">
+            <!-- Order Book -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-list me-2"></i>
+                        订单簿
+                    </h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="order-book">
+                        <!-- Sell Orders (Asks) -->
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr class="table-light">
+                                        <th>价格</th>
+                                        <th>数量</th>
+                                        <th>总额</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sell-orders-body">
+                                    <!-- Sell orders will be populated here -->
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted">
+                                            <div class="spinner-border spinner-border-sm" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Current Price -->
+                        <div class="text-center py-2 bg-light">
+                            <strong class="text-primary" id="spread-price">¥50,000.00</strong>
+                            <small class="text-muted d-block">当前价格</small>
+                        </div>
+
+                        <!-- Buy Orders (Bids) -->
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <tbody id="buy-orders-body">
+                                    <!-- Buy orders will be populated here -->
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted">
+                                            <div class="spinner-border spinner-border-sm" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Forms -->
+            <div class="row">
+                <!-- Buy Form -->
+                <div class="col-6">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0">买入</h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="buy-order-form">
+                                <div class="mb-2">
+                                    <label for="buy-price" class="form-label">价格</label>
+                                    <input type="number" class="form-control form-control-sm" id="buy-price"
+                                           step="0.01" min="0" placeholder="0.00">
+                                </div>
+                                <div class="mb-2">
+                                    <label for="buy-quantity" class="form-label">数量</label>
+                                    <input type="number" class="form-control form-control-sm" id="buy-quantity"
+                                           step="0.001" min="0" placeholder="0.000">
+                                </div>
+                                <div class="mb-3">
+                                    <small class="text-muted">
+                                        总额: ¥<span id="buy-total">0.00</span>
+                                    </small>
+                                </div>
+                                <button type="submit" class="btn btn-success w-100 btn-sm">
+                                    <i class="fas fa-arrow-up me-1"></i>买入
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sell Form -->
+                <div class="col-6">
+                    <div class="card">
+                        <div class="card-header bg-danger text-white">
+                            <h6 class="mb-0">卖出</h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="sell-order-form">
+                                <div class="mb-2">
+                                    <label for="sell-price" class="form-label">价格</label>
+                                    <input type="number" class="form-control form-control-sm" id="sell-price"
+                                           step="0.01" min="0" placeholder="0.00">
+                                </div>
+                                <div class="mb-2">
+                                    <label for="sell-quantity" class="form-label">数量</label>
+                                    <input type="number" class="form-control form-control-sm" id="sell-quantity"
+                                           step="0.001" min="0" placeholder="0.000">
+                                </div>
+                                <div class="mb-3">
+                                    <small class="text-muted">
+                                        总额: ¥<span id="sell-total">0.00</span>
+                                    </small>
+                                </div>
+                                <button type="submit" class="btn btn-danger w-100 btn-sm">
+                                    <i class="fas fa-arrow-down me-1"></i>卖出
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Middle Column: Price Chart -->
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-chart-area me-2"></i>
+                        价格图表
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="price-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Order History and Balance -->
+        <div class="col-lg-3">
+            <!-- User Balance -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-wallet me-2"></i>
+                        账户余额
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-12 mb-2">
+                            <div class="d-flex justify-content-between">
+                                <span>USDT:</span>
+                                <strong id="balance-USDT">Loading...</strong>
+                            </div>
+                        </div>
+                        <div class="col-12 mb-2">
+                            <div class="d-flex justify-content-between">
+                                <span th:text="${symbol != null ? symbol.substring(0, symbol.length() - 4) : 'BTC'}">BTC:</span>
+                                <strong id="balance-BTC">Loading...</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Orders -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-history me-2"></i>
+                        最近订单
+                    </h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>时间</th>
+                                    <th>类型</th>
+                                    <th>价格</th>
+                                    <th>状态</th>
+                                </tr>
+                            </thead>
+                            <tbody id="order-history-body">
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">
+                                        暂无订单记录
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts Fragment -->
+<div th:fragment="scripts">
+    <script>
+        // Trading page specific scripts
+        document.addEventListener('DOMContentLoaded', function() {
+            // Update total amount calculations
+            function updateTotal(side) {
+                const price = parseFloat(document.getElementById(side + '-price').value) || 0;
+                const quantity = parseFloat(document.getElementById(side + '-quantity').value) || 0;
+                const total = price * quantity;
+                document.getElementById(side + '-total').textContent = total.toFixed(2);
+            }
+
+            // Add event listeners for total calculations
+            ['buy-price', 'buy-quantity'].forEach(id => {
+                document.getElementById(id).addEventListener('input', () => updateTotal('buy'));
+            });
+
+            ['sell-price', 'sell-quantity'].forEach(id => {
+                document.getElementById(id).addEventListener('input', () => updateTotal('sell'));
+            });
+        });
+    </script>
+</div>
+
+</html>

@@ -1,0 +1,152 @@
+# 测试余额冻结功能的HTTP请求脚本
+# 可以使用IntelliJ IDEA的HTTP Client或其他HTTP测试工具执行
+
+### 1. 首先添加初始余额 1000 USDT
+POST http://localhost:8080/api/account/balance
+Content-Type: application/json
+
+{
+  "userId": 888,
+  "currency": "USDT",
+  "amount": 1000
+}
+
+### 2. 检查初始余额
+GET http://localhost:8080/api/account/balance/888?currency=USDT
+
+### 3. 下第一笔买单：100 * 5 = 500 USDT (应该成功)
+POST http://localhost:8080/api/trading/orders
+Content-Type: application/json
+
+{
+  "userId": 888,
+  "symbol": "BTCUSDT",
+  "side": "BUY",
+  "type": "LIMIT",
+  "price": "100",
+  "quantity": "5"
+}
+
+### 4. 检查第一笔订单后的余额 (应该剩余500可用)
+GET http://localhost:8080/api/account/balance/888?currency=USDT
+
+### 5. 下第二笔买单：100 * 6 = 600 USDT (应该失败，余额不足)
+POST http://localhost:8080/api/trading/orders
+Content-Type: application/json
+
+{
+  "userId": 888,
+  "symbol": "BTCUSDT",
+  "side": "BUY",
+  "type": "LIMIT",
+  "price": "100",
+  "quantity": "6"
+}
+
+### 6. 下第三笔买单：100 * 5 = 500 USDT (应该成功，用完所有余额)
+POST http://localhost:8080/api/trading/orders
+Content-Type: application/json
+
+{
+  "userId": 888,
+  "symbol": "BTCUSDT",
+  "side": "BUY",
+  "type": "LIMIT",
+  "price": "100",
+  "quantity": "5"
+}
+
+### 7. 检查第三笔订单后的余额 (应该为0可用)
+GET http://localhost:8080/api/account/balance/888?currency=USDT
+
+### 8. 下第四笔买单：1 * 1 = 1 USDT (应该失败，余额不足)
+POST http://localhost:8080/api/trading/orders
+Content-Type: application/json
+
+{
+  "userId": 888,
+  "symbol": "BTCUSDT",
+  "side": "BUY",
+  "type": "LIMIT",
+  "price": "1",
+  "quantity": "1"
+}
+
+### ========== 卖单测试 ==========
+
+### 9. 添加BTC余额用于卖单测试
+POST http://localhost:8080/api/account/balance
+Content-Type: application/json
+
+{
+  "userId": 888,
+  "currency": "BTC",
+  "amount": 10
+}
+
+### 10. 检查BTC余额
+GET http://localhost:8080/api/account/balance/888?currency=BTC
+
+### 11. 下第一笔卖单：5 BTC (应该成功)
+POST http://localhost:8080/api/trading/orders
+Content-Type: application/json
+
+{
+  "userId": 888,
+  "symbol": "BTCUSDT",
+  "side": "SELL",
+  "type": "LIMIT",
+  "price": "50000",
+  "quantity": "5"
+}
+
+### 12. 检查第一笔卖单后的BTC余额 (应该剩余5可用)
+GET http://localhost:8080/api/account/balance/888?currency=BTC
+
+### 13. 下第二笔卖单：6 BTC (应该失败，余额不足)
+POST http://localhost:8080/api/trading/orders
+Content-Type: application/json
+
+{
+  "userId": 888,
+  "symbol": "BTCUSDT",
+  "side": "SELL",
+  "type": "LIMIT",
+  "price": "50000",
+  "quantity": "6"
+}
+
+### 14. 下第三笔卖单：5 BTC (应该成功，用完所有BTC)
+POST http://localhost:8080/api/trading/orders
+Content-Type: application/json
+
+{
+  "userId": 888,
+  "symbol": "BTCUSDT",
+  "side": "SELL",
+  "type": "LIMIT",
+  "price": "50000",
+  "quantity": "5"
+}
+
+### 15. 检查最终BTC余额 (应该为0可用)
+GET http://localhost:8080/api/account/balance/888?currency=BTC
+
+### 16. 下第四笔卖单：1 BTC (应该失败，余额不足)
+POST http://localhost:8080/api/trading/orders
+Content-Type: application/json
+
+{
+  "userId": 888,
+  "symbol": "BTCUSDT",
+  "side": "SELL",
+  "type": "LIMIT",
+  "price": "50000",
+  "quantity": "1"
+}
+
+### 17. 最终检查所有余额状态
+GET http://localhost:8080/api/account/balance/888?currency=USDT
+
+###
+GET http://localhost:8080/api/account/balance/888?currency=BTC

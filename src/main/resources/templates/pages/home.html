@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<!-- Content Fragment -->
+<div th:fragment="content">
+    <!-- Connection Status -->
+    <div class="connection-status">
+        <span id="connection-status" class="badge disconnected">未连接</span>
+    </div>
+
+    <!-- Welcome Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>
+                        交易引擎系统
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-lg-8">
+                            <p class="lead">欢迎使用高性能交易引擎系统！</p>
+
+                            <h5 class="mt-4 mb-3">主要功能：</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <ul class="list-unstyled">
+                                        <li class="mb-2">
+                                            <i class="fas fa-check-circle text-success me-2"></i>
+                                            账户资金管理
+                                        </li>
+                                        <li class="mb-2">
+                                            <i class="fas fa-check-circle text-success me-2"></i>
+                                            实时交易下单
+                                        </li>
+                                        <li class="mb-2">
+                                            <i class="fas fa-check-circle text-success me-2"></i>
+                                            订单管理功能
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <ul class="list-unstyled">
+                                        <li class="mb-2">
+                                            <i class="fas fa-check-circle text-success me-2"></i>
+                                            实时订单簿
+                                        </li>
+                                        <li class="mb-2">
+                                            <i class="fas fa-check-circle text-success me-2"></i>
+                                            价格图表显示
+                                        </li>
+                                        <li class="mb-2">
+                                            <i class="fas fa-check-circle text-success me-2"></i>
+                                            WebSocket实时推送
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="text-center">
+                                <i class="fas fa-rocket fa-5x text-primary mb-3"></i>
+                                <h5>高性能交易</h5>
+                                <p class="text-muted">毫秒级响应，稳定可靠</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trading Pairs Section -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-coins me-2"></i>
+                        支持的交易对
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row" id="trading-pairs-container">
+                        <!-- Trading pairs will be loaded here dynamically -->
+                        <div class="col-12 text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2 text-muted">正在加载交易对...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Section -->
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card balance-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-chart-bar fa-3x me-3"></i>
+                        <div>
+                            <h6 class="card-title">总交易量</h6>
+                            <p class="card-text balance-amount" id="total-volume">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card balance-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-users fa-3x me-3"></i>
+                        <div>
+                            <h6 class="card-title">活跃用户</h6>
+                            <p class="card-text balance-amount" id="active-users">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card balance-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-clock fa-3x me-3"></i>
+                        <div>
+                            <h6 class="card-title">系统状态</h6>
+                            <p class="card-text balance-amount">正常运行</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts Fragment -->
+<div th:fragment="scripts">
+    <script>
+        // Home page specific scripts
+        document.addEventListener('DOMContentLoaded', function() {
+            // Update statistics with mock data
+            setTimeout(() => {
+                document.getElementById('total-volume').textContent = '¥1,234,567.89';
+                document.getElementById('active-users').textContent = '156';
+            }, 1000);
+        });
+    </script>
+</div>
+
+</html>
