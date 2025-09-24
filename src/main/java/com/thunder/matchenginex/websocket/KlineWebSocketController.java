@@ -195,17 +195,12 @@ public class KlineWebSocketController {
                 }
             }
 
-            // Always push if timestamp is different (new time period)
-            if (lastSent != null && lastSent.getTimestamp() != latestKline.getTimestamp()) {
-                log.debug("New time period for {} {}, forcing push", symbol, timeframe);
-            }
-
             // Send update to all subscribers - 向所有订阅者发送更新
             String topic = "/topic/kline/" + symbol + "/" + timeframe;
-            log.info("🚀 PUSHING K-line update to {}: OHLC[{},{},{},{}] vol:{} ts:{}",
-                    topic, latestKline.getOpen(), latestKline.getHigh(),
-                    latestKline.getLow(), latestKline.getClose(),
-                    latestKline.getVolume(), latestKline.getTimestamp());
+//            log.info("🚀 PUSHING K-line update to {}: OHLC[{},{},{},{}] vol:{} ts:{}",
+//                    topic, latestKline.getOpen(), latestKline.getHigh(),
+//                    latestKline.getLow(), latestKline.getClose(),
+//                    latestKline.getVolume(), latestKline.getTimestamp());
 
             try {
                 messagingTemplate.convertAndSend(topic, latestKline);
@@ -215,8 +210,6 @@ public class KlineWebSocketController {
 
             // Update cache - 更新缓存
             lastSentKlines.get(symbol).put(timeframe, latestKline);
-
-            log.info("✅ Successfully pushed K-line update for {} {}", symbol, timeframe);
 
         } catch (Exception e) {
             log.error("Error pushing K-line update for {} {}", symbol, timeframe, e);

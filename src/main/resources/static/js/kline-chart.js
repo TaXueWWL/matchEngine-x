@@ -18,10 +18,22 @@ class KlineChart {
         // 保存订阅对象引用以便正确取消订阅
         this.updateSubscription = null;
         this.initialSubscription = null;
+        // 定时刷新相关
+        this.refreshTimer = null;
+        this.refreshInterval = 3000; // 3秒刷新一次
+        this.isRefreshing = false;
+        this.autoRefreshEnabled = true;
 
         // Chart configuration - Dark theme chart configuration
+        // 延迟获取容器尺寸，避免在DOM未准备好时访问
+        const getContainerWidth = () => {
+            if (!this.container) return 800; // 默认宽度
+            const width = this.container.clientWidth;
+            return width > 0 ? width : 800; // 确保有最小宽度
+        };
+
         this.chartOptions = {
-            width: this.container.clientWidth,
+            width: getContainerWidth(),
             height: options.height || 400,
             layout: {
                 backgroundColor: '#181A20',
@@ -76,8 +88,43 @@ class KlineChart {
             console.log('LightweightCharts available:', !!LightweightCharts);
             console.log('createChart available:', typeof LightweightCharts.createChart);
 
+            // 验证容器和配置
+            console.log('🔍 Pre-chart creation validation:', {
+                container: this.container,
+                containerTagName: this.container ? this.container.tagName : null,
+                containerId: this.containerId,
+                containerInDOM: this.container ? document.contains(this.container) : false,
+                chartOptions: this.chartOptions,
+                optionsValid: this.chartOptions && typeof this.chartOptions === 'object'
+            });
+
+            // 验证chartOptions中的关键字段
+            if (!this.chartOptions || typeof this.chartOptions !== 'object') {
+                throw new Error('Invalid chart options');
+            }
+
+            if (!this.container || !this.container.tagName) {
+                throw new Error('Invalid container element');
+            }
+
             // Create chart - 创建图表
-            this.chart = LightweightCharts.createChart(this.container, this.chartOptions);
+            console.log('🎯 Creating chart with options:', this.chartOptions);
+
+            try {
+                this.chart = LightweightCharts.createChart(this.container, this.chartOptions);
+                console.log('✅ Chart created successfully:', !!this.chart);
+            } catch (chartCreationError) {
+                console.error('❌ Failed to create chart:', chartCreationError);
+                console.error('❌ Chart creation error details:', {
+                    error: chartCreationError.message,
+                    stack: chartCreationError.stack,
+                    container: this.container,
+                    containerWidth: this.container ? this.container.clientWidth : 'N/A',
+                    containerHeight: this.container ? this.container.clientHeight : 'N/A',
+                    chartOptions: this.chartOptions
+                });
+                throw chartCreationError;
+            }
 
             console.log('Chart created:', !!this.chart);
             console.log('Chart methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(this.chart)));
@@ -86,24 +133,37 @@ class KlineChart {
             console.log('Available methods on chart:', Object.getOwnPropertyNames(this.chart));
 
             // Try different method names for different versions
-            if (typeof this.chart.addCandlestickSeries === 'function') {
-                this.candlestickSeries = this.chart.addCandlestickSeries({
-                    upColor: '#02C076',       // Bitget green for up candles
-                    downColor: '#F6465D',     // Bitget red for down candles
+            try {
+                const seriesOptions = {
+                    upColor: '#00C851',       // Green for up candles (涨)
+                    downColor: '#FF4444',     // Red for down candles (跌)
                     borderVisible: false,
-                    wickUpColor: '#02C076',   // Green wicks for up candles
-                    wickDownColor: '#F6465D', // Red wicks for down candles
+                    wickUpColor: '#00C851',   // Green wicks for up candles
+                    wickDownColor: '#FF4444', // Red wicks for down candles
+                };
+
+                console.log('🔧 Adding candlestick series with options:', seriesOptions);
+
+                if (typeof this.chart.addCandlestickSeries === 'function') {
+                    console.log('📊 Using addCandlestickSeries method');
+                    this.candlestickSeries = this.chart.addCandlestickSeries(seriesOptions);
+                } else if (typeof this.chart.addSeries === 'function') {
+                    console.log('📊 Using addSeries method');
+                    this.candlestickSeries = this.chart.addSeries('candlestick', seriesOptions);
+                } else {
+                    throw new Error('No suitable method found to add candlestick series');
+                }
+
+                console.log('✅ Candlestick series created successfully:', !!this.candlestickSeries);
+
+            } catch (seriesCreationError) {
+                console.error('❌ Failed to create candlestick series:', seriesCreationError);
+                console.error('❌ Series creation error details:', {
+                    error: seriesCreationError.message,
+                    stack: seriesCreationError.stack,
+                    chartMethods: this.chart ? Object.getOwnPropertyNames(this.chart) : 'No chart'
                 });
-            } else if (typeof this.chart.addSeries === 'function') {
-                this.candlestickSeries = this.chart.addSeries('candlestick', {
-                    upColor: '#02C076',       // Bitget green for up candles
-                    downColor: '#F6465D',     // Bitget red for down candles
-                    borderVisible: false,
-                    wickUpColor: '#02C076',   // Green wicks for up candles
-                    wickDownColor: '#F6465D', // Red wicks for down candles
-                });
-            } else {
-                throw new Error('No suitable method found to add candlestick series');
+                throw seriesCreationError;
             }
 
             // Handle resize - 处理窗口大小调整
@@ -118,6 +178,9 @@ class KlineChart {
             } else {
                 console.log('WebSocket not ready, K-line chart will show historical data only');
             }
+
+            // Start auto-refresh timer - 启动自动刷新定时器
+            this.startAutoRefresh();
 
             console.log('K-line chart initialized for', this.symbol, this.timeframe);
 
@@ -746,9 +809,156 @@ class KlineChart {
     }
 
     /**
+     * Start auto-refresh timer - 启动自动刷新定时器
+     */
+    startAutoRefresh() {
+        if (!this.autoRefreshEnabled) {
+            console.log('🔄 Auto-refresh is disabled');
+            return;
+        }
+
+        // 清除现有定时器
+        if (this.refreshTimer) {
+            clearInterval(this.refreshTimer);
+        }
+
+        console.log(`🔄 Starting auto-refresh every ${this.refreshInterval/1000} seconds`);
+
+        this.refreshTimer = setInterval(() => {
+            this.refreshKlineData();
+        }, this.refreshInterval);
+    }
+
+    /**
+     * Stop auto-refresh timer - 停止自动刷新定时器
+     */
+    stopAutoRefresh() {
+        if (this.refreshTimer) {
+            clearInterval(this.refreshTimer);
+            this.refreshTimer = null;
+            console.log('🔄 Auto-refresh stopped');
+        }
+    }
+
+    /**
+     * Manual refresh K-line data - 手动刷新K线数据
+     */
+    async refreshKlineData() {
+        if (this.isRefreshing) {
+            console.log('🔄 Refresh already in progress, skipping...');
+            return;
+        }
+
+        try {
+            this.isRefreshing = true;
+            console.log('🔄 Refreshing K-line data...');
+
+            // 显示刷新指示器
+            this.showRefreshIndicator();
+
+            // 重新加载数据
+            await this.loadInitialData();
+
+            console.log('✅ K-line data refreshed successfully');
+
+        } catch (error) {
+            console.error('❌ Error refreshing K-line data:', error);
+        } finally {
+            this.isRefreshing = false;
+            // 隐藏刷新指示器
+            this.hideRefreshIndicator();
+        }
+    }
+
+    /**
+     * Show refresh indicator - 显示刷新指示器
+     */
+    showRefreshIndicator() {
+        // 在图表容器上添加刷新指示器
+        if (!this.container) return;
+
+        let refreshIndicator = this.container.querySelector('.refresh-indicator');
+        if (!refreshIndicator) {
+            refreshIndicator = document.createElement('div');
+            refreshIndicator.className = 'refresh-indicator';
+            refreshIndicator.innerHTML = `
+                <div class="refresh-spinner">
+                    <i class="fas fa-sync-alt fa-spin"></i>
+                    <span>刷新中...</span>
+                </div>
+            `;
+            refreshIndicator.style.cssText = `
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                z-index: 1000;
+                background: rgba(0, 0, 0, 0.7);
+                color: white;
+                padding: 8px 12px;
+                border-radius: 4px;
+                font-size: 12px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            `;
+            this.container.style.position = 'relative';
+            this.container.appendChild(refreshIndicator);
+        } else {
+            refreshIndicator.style.display = 'flex';
+        }
+    }
+
+    /**
+     * Hide refresh indicator - 隐藏刷新指示器
+     */
+    hideRefreshIndicator() {
+        if (!this.container) return;
+
+        const refreshIndicator = this.container.querySelector('.refresh-indicator');
+        if (refreshIndicator) {
+            refreshIndicator.style.display = 'none';
+        }
+    }
+
+    /**
+     * Toggle auto-refresh - 切换自动刷新
+     */
+    toggleAutoRefresh() {
+        this.autoRefreshEnabled = !this.autoRefreshEnabled;
+
+        if (this.autoRefreshEnabled) {
+            this.startAutoRefresh();
+            console.log('✅ Auto-refresh enabled');
+        } else {
+            this.stopAutoRefresh();
+            console.log('🔄 Auto-refresh disabled');
+        }
+
+        return this.autoRefreshEnabled;
+    }
+
+    /**
+     * Set refresh interval - 设置刷新间隔
+     */
+    setRefreshInterval(intervalMs) {
+        this.refreshInterval = intervalMs;
+
+        if (this.autoRefreshEnabled && this.refreshTimer) {
+            // 重启定时器以应用新间隔
+            this.stopAutoRefresh();
+            this.startAutoRefresh();
+        }
+
+        console.log(`🔄 Refresh interval set to ${intervalMs/1000} seconds`);
+    }
+
+    /**
      * Destroy chart and cleanup - 销毁图表并清理
      */
     destroy() {
+        // 停止自动刷新
+        this.stopAutoRefresh();
+
         // 取消订阅
         this.unsubscribeFromUpdates();
 

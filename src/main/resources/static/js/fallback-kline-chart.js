@@ -15,6 +15,11 @@ class FallbackKlineChart {
         this.lastKnownPrice = null; // 用于心跳数据的价格参考
         // 保存订阅对象引用以便正确取消订阅
         this.updateSubscription = null;
+        // 定时刷新相关
+        this.refreshTimer = null;
+        this.refreshInterval = 3000; // 3秒刷新一次
+        this.isRefreshing = false;
+        this.autoRefreshEnabled = true;
 
         console.log('Using fallback Chart.js implementation');
         this.init();
@@ -42,8 +47,8 @@ class FallbackKlineChart {
                     datasets: [{
                         label: `${this.symbol} Price`,
                         data: [],
-                        borderColor: '#02C076',
-                        backgroundColor: 'rgba(2, 192, 118, 0.1)',
+                        borderColor: '#00C851',
+                        backgroundColor: 'rgba(0, 200, 81, 0.1)',
                         tension: 0.1
                     }]
                 },
@@ -101,6 +106,9 @@ class FallbackKlineChart {
             } else {
                 console.log('WebSocket not ready, fallback chart will show historical data only');
             }
+
+            // Start auto-refresh timer - 启动自动刷新定时器
+            this.startAutoRefresh();
 
             console.log('Fallback K-line chart initialized successfully');
 
@@ -386,7 +394,99 @@ class FallbackKlineChart {
         return 'fallback_kline_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
     }
 
+    /**
+     * Start auto-refresh timer - 启动自动刷新定时器
+     */
+    startAutoRefresh() {
+        if (!this.autoRefreshEnabled) {
+            console.log('🔄 [FALLBACK] Auto-refresh is disabled');
+            return;
+        }
+
+        // 清除现有定时器
+        if (this.refreshTimer) {
+            clearInterval(this.refreshTimer);
+        }
+
+        console.log(`🔄 [FALLBACK] Starting auto-refresh every ${this.refreshInterval/1000} seconds`);
+
+        this.refreshTimer = setInterval(() => {
+            this.refreshKlineData();
+        }, this.refreshInterval);
+    }
+
+    /**
+     * Stop auto-refresh timer - 停止自动刷新定时器
+     */
+    stopAutoRefresh() {
+        if (this.refreshTimer) {
+            clearInterval(this.refreshTimer);
+            this.refreshTimer = null;
+            console.log('🔄 [FALLBACK] Auto-refresh stopped');
+        }
+    }
+
+    /**
+     * Manual refresh K-line data - 手动刷新K线数据
+     */
+    async refreshKlineData() {
+        if (this.isRefreshing) {
+            console.log('🔄 [FALLBACK] Refresh already in progress, skipping...');
+            return;
+        }
+
+        try {
+            this.isRefreshing = true;
+            console.log('🔄 [FALLBACK] Refreshing K-line data...');
+
+            // 重新加载数据
+            await this.loadInitialData();
+
+            console.log('✅ [FALLBACK] K-line data refreshed successfully');
+
+        } catch (error) {
+            console.error('❌ [FALLBACK] Error refreshing K-line data:', error);
+        } finally {
+            this.isRefreshing = false;
+        }
+    }
+
+    /**
+     * Toggle auto-refresh - 切换自动刷新
+     */
+    toggleAutoRefresh() {
+        this.autoRefreshEnabled = !this.autoRefreshEnabled;
+
+        if (this.autoRefreshEnabled) {
+            this.startAutoRefresh();
+            console.log('✅ [FALLBACK] Auto-refresh enabled');
+        } else {
+            this.stopAutoRefresh();
+            console.log('🔄 [FALLBACK] Auto-refresh disabled');
+        }
+
+        return this.autoRefreshEnabled;
+    }
+
+    /**
+     * Set refresh interval - 设置刷新间隔
+     */
+    setRefreshInterval(intervalMs) {
+        this.refreshInterval = intervalMs;
+
+        if (this.autoRefreshEnabled && this.refreshTimer) {
+            // 重启定时器以应用新间隔
+            this.stopAutoRefresh();
+            this.startAutoRefresh();
+        }
+
+        console.log(`🔄 [FALLBACK] Refresh interval set to ${intervalMs/1000} seconds`);
+    }
+
     destroy() {
+        // 停止自动刷新
+        this.stopAutoRefresh();
+
         // 取消订阅
         this.unsubscribeFromUpdates();
 

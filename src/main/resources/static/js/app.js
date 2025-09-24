@@ -1296,3 +1296,154 @@ function testKlineWebSocket() {
 
 // Make test function available globally
 window.testKlineWebSocket = testKlineWebSocket;
+
+// K-line refresh control functions - K线刷新控制函数
+
+/**
+ * Manual refresh K-line data - 手动刷新K线数据
+ */
+function manualRefreshKline() {
+    console.log('🔄 Manual K-line refresh triggered');
+
+    const refreshBtn = document.getElementById('manual-refresh-btn');
+    if (refreshBtn) {
+        // 添加旋转动画
+        refreshBtn.classList.add('disabled');
+        const icon = refreshBtn.querySelector('i');
+        if (icon) {
+            icon.classList.add('fa-spin');
+        }
+    }
+
+    // 刷新K线图
+    if (klineChart && typeof klineChart.refreshKlineData === 'function') {
+        klineChart.refreshKlineData().finally(() => {
+            // 恢复按钮状态
+            if (refreshBtn) {
+                refreshBtn.classList.remove('disabled');
+                const icon = refreshBtn.querySelector('i');
+                if (icon) {
+                    icon.classList.remove('fa-spin');
+                }
+            }
+        });
+    } else {
+        console.warn('⚠️ K-line chart or refresh method not available');
+        // 恢复按钮状态
+        setTimeout(() => {
+            if (refreshBtn) {
+                refreshBtn.classList.remove('disabled');
+                const icon = refreshBtn.querySelector('i');
+                if (icon) {
+                    icon.classList.remove('fa-spin');
+                }
+            }
+        }, 1000);
+    }
+}
+
+/**
+ * Toggle auto-refresh for K-line chart - 切换K线图自动刷新
+ */
+function toggleAutoRefresh() {
+    console.log('🔄 Toggle auto-refresh triggered');
+
+    const toggleBtn = document.getElementById('auto-refresh-toggle');
+
+    if (klineChart && typeof klineChart.toggleAutoRefresh === 'function') {
+        const isEnabled = klineChart.toggleAutoRefresh();
+
+        // 更新按钮状态
+        if (toggleBtn) {
+            const icon = toggleBtn.querySelector('i');
+            if (isEnabled) {
+                toggleBtn.classList.remove('btn-outline-danger');
+                toggleBtn.classList.add('btn-outline-success', 'active');
+                toggleBtn.title = '自动刷新已启用 - 点击禁用';
+                if (icon) {
+                    icon.classList.remove('fa-pause');
+                    icon.classList.add('fa-play');
+                }
+            } else {
+                toggleBtn.classList.remove('btn-outline-success', 'active');
+                toggleBtn.classList.add('btn-outline-danger');
+                toggleBtn.title = '自动刷新已禁用 - 点击启用';
+                if (icon) {
+                    icon.classList.remove('fa-play');
+                    icon.classList.add('fa-pause');
+                }
+            }
+        }
+
+        console.log(isEnabled ? '✅ Auto-refresh enabled' : '🔄 Auto-refresh disabled');
+    } else {
+        console.warn('⚠️ K-line chart or toggle method not available');
+    }
+}
+
+/**
+ * Set refresh interval for K-line chart - 设置K线图刷新间隔
+ */
+function setKlineRefreshInterval(intervalMs) {
+    if (klineChart && typeof klineChart.setRefreshInterval === 'function') {
+        klineChart.setRefreshInterval(intervalMs);
+        console.log(`🔄 K-line refresh interval set to ${intervalMs/1000} seconds`);
+    } else {
+        console.warn('⚠️ K-line chart or setRefreshInterval method not available');
+    }
+}
+
+/**
+ * Update refresh interval from input field - 从输入框更新刷新间隔
+ */
+function updateRefreshInterval() {
+    const input = document.getElementById('refresh-interval-input');
+    if (!input) {
+        console.warn('⚠️ Refresh interval input not found');
+        return;
+    }
+
+    const intervalSeconds = parseInt(input.value);
+    if (isNaN(intervalSeconds) || intervalSeconds < 1 || intervalSeconds > 300) {
+        alert('刷新间隔必须在1-300秒之间');
+        input.value = 3; // 重置为默认值
+        return;
+    }
+
+    const intervalMs = intervalSeconds * 1000;
+
+    // 更新主图表
+    if (klineChart && typeof klineChart.setRefreshInterval === 'function') {
+        klineChart.setRefreshInterval(intervalMs);
+        console.log(`✅ Main K-line refresh interval updated to ${intervalSeconds} seconds`);
+    }
+
+    // 更新备用图表
+    if (window.fallbackKlineChart && typeof window.fallbackKlineChart.setRefreshInterval === 'function') {
+        window.fallbackKlineChart.setRefreshInterval(intervalMs);
+        console.log(`✅ Fallback K-line refresh interval updated to ${intervalSeconds} seconds`);
+    }
+
+    // 显示成功提示
+    const button = document.querySelector('button[onclick="updateRefreshInterval()"]');
+    if (button) {
+        const icon = button.querySelector('i');
+        if (icon) {
+            // 临时改变图标表示成功
+            icon.classList.remove('fa-check');
+            icon.classList.add('fa-check-circle', 'text-success');
+            setTimeout(() => {
+                icon.classList.remove('fa-check-circle', 'text-success');
+                icon.classList.add('fa-check');
+            }, 1500);
+        }
+    }
+
+    console.log(`🔄 K-line refresh interval updated to ${intervalSeconds} seconds`);
+}
+
+// Make refresh functions globally available
+window.manualRefreshKline = manualRefreshKline;
+window.toggleAutoRefresh = toggleAutoRefresh;
+window.setKlineRefreshInterval = setKlineRefreshInterval;
+window.updateRefreshInterval = updateRefreshInterval;

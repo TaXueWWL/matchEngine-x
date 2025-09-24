@@ -138,9 +138,15 @@
                                        step="0.001" min="0" placeholder="0.000" required>
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-plus me-1"></i>添加余额
-                        </button>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>添加余额
+                            </button>
+                            <!-- 一键充值按钮 -->
+                            <button type="button" class="btn btn-success" onclick="quickTopUp()" title="一键充值测试资金">
+                                <i class="fas fa-magic me-1"></i>一键充值
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -290,6 +296,87 @@
                     if (balanceElement) {
                         balanceElement.textContent = currency === 'USDT' ? '0.00' : '0.00000000';
                     }
+                });
+        }
+
+        /**
+         * 一键充值测试资金 - Quick top-up test funds
+         */
+        function quickTopUp() {
+            const userIdElement = document.getElementById('currentUserId');
+            const currentUserId = userIdElement ? parseInt(userIdElement.textContent) : 1;
+
+            // 显示确认对话框
+            if (!confirm('确认一键充值测试资金吗？\n将为您充值:\n• 100,000 USDT\n• 100 BTC\n• 100 ETH\n• 100 ADA')) {
+                return;
+            }
+
+            // 定义充值配置
+            const topUpConfig = [
+                { currency: 'USDT', amount: 100000 },
+                { currency: 'BTC', amount: 100 },
+                { currency: 'ETH', amount: 100 },
+                { currency: 'ADA', amount: 100 }
+            ];
+
+            // 禁用按钮并显示加载状态
+            const quickTopUpBtn = document.querySelector('button[onclick="quickTopUp()"]');
+            const originalText = quickTopUpBtn.innerHTML;
+            quickTopUpBtn.disabled = true;
+            quickTopUpBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>充值中...';
+
+            // 并行执行充值请求
+            const topUpPromises = topUpConfig.map(config => {
+                return fetch('/api/account/balance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId: currentUserId,
+                        currency: config.currency,
+                        amount: config.amount
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`${config.currency} 充值失败: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log(`✅ ${config.currency} 充值成功:`, data);
+                    // 刷新该币种余额显示
+                    loadCurrencyBalance(config.currency, currentUserId);
+                    return { currency: config.currency, success: true };
+                })
+                .catch(error => {
+                    console.error(`❌ ${config.currency} 充值失败:`, error);
+                    return { currency: config.currency, success: false, error: error.message };
+                });
+            });
+
+            // 等待所有充值请求完成
+            Promise.all(topUpPromises)
+                .then(results => {
+                    const successCount = results.filter(r => r.success).length;
+                    const failCount = results.length - successCount;
+
+                    if (failCount === 0) {
+                        alert(`✅ 一键充值完成！\n成功充值 ${successCount} 种币种。`);
+                    } else {
+                        const failedCurrencies = results.filter(r => !r.success).map(r => r.currency).join(', ');
+                        alert(`⚠️ 充值部分成功！\n成功: ${successCount} 种币种\n失败: ${failedCurrencies}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('批量充值出错:', error);
+                    alert('❌ 充值过程中出现错误，请检查网络连接或联系管理员。');
+                })
+                .finally(() => {
+                    // 恢复按钮状态
+                    quickTopUpBtn.disabled = false;
+                    quickTopUpBtn.innerHTML = originalText;
                 });
         }
     </script>
