@@ -12,6 +12,7 @@ class FallbackKlineChart {
         this.timeframe = options.timeframe || '1m';
         this.stompClient = options.stompClient || null;
         this.sessionId = options.sessionId || this.generateSessionId();
+        this.lastKnownPrice = null; // 用于心跳数据的价格参考
         // 保存订阅对象引用以便正确取消订阅
         this.updateSubscription = null;
 
@@ -128,14 +129,36 @@ class FallbackKlineChart {
             });
 
             if (klines && klines.length > 0) {
-                const labels = klines.map(k => new Date(k.timestamp * 1000));
-                const prices = klines.map(k => parseFloat(k.close));
+                console.log(`📊 [FALLBACK] Processing ${klines.length} initial K-line records...`);
+                const labels = [];
+                const prices = [];
+
+                klines.forEach((k, index) => {
+                    const timestamp = new Date(k.timestamp * 1000);
+                    let price = parseFloat(k.close);
+
+                    // 处理价格为0的情况
+                    if (price === 0) {
+                        if (this.lastKnownPrice && this.lastKnownPrice > 0) {
+                            price = this.lastKnownPrice;
+                            console.log(`💓 [FALLBACK] Using last known price ${price} for zero-price data at index ${index}`);
+                        } else {
+                            price = 0.001;
+                            console.log(`💓 [FALLBACK] Using default price 0.001 for initial zero-price data at index ${index}`);
+                        }
+                    } else if (price > 0) {
+                        this.lastKnownPrice = price;
+                    }
+
+                    labels.push(timestamp);
+                    prices.push(price);
+                });
 
                 this.chart.data.labels = labels;
                 this.chart.data.datasets[0].data = prices;
                 this.chart.update();
 
-                console.log(`✅ [FALLBACK] Loaded ${klines.length} K-line data points successfully`);
+                console.log(`✅ [FALLBACK] Loaded ${klines.length} K-line data points successfully (including zero-price handling)`);
             } else {
                 console.log('⚠️ [FALLBACK] No initial K-line data available');
             }
@@ -169,20 +192,41 @@ class FallbackKlineChart {
             console.log(`🔔 [FALLBACK] Subscribing to K-line updates: ${updateTopic}`);
             this.updateSubscription = this.stompClient.subscribe(updateTopic, (message) => {
                 console.log(`📈 [FALLBACK] Received K-line update for ${this.symbol}/${this.timeframe}:`, message);
-                const kline = JSON.parse(message.body);
-                console.log(`📊 [FALLBACK] Parsed K-line data:`, {
-                    symbol: kline.symbol,
-                    timeframe: kline.timeframe,
-                    timestamp: new Date(kline.timestamp * 1000),
-                    open: kline.open,
-                    high: kline.high,
-                    low: kline.low,
-                    close: kline.close,
-                    volume: kline.volume,
-                    amount: kline.amount,
-                    tradeCount: kline.tradeCount
-                });
-                this.updateChart(kline);
+                console.log(`📈 [FALLBACK] Message body length:`, message.body ? message.body.length : 0);
+                console.log(`📈 [FALLBACK] Raw message body:`, message.body);
+
+                try {
+                    const kline = JSON.parse(message.body);
+                    console.log(`📊 [FALLBACK] Parsed K-line data:`, {
+                        symbol: kline.symbol,
+                        timeframe: kline.timeframe,
+                        timestamp: new Date(kline.timestamp * 1000),
+                        open: kline.open,
+                        high: kline.high,
+                        low: kline.low,
+                        close: kline.close,
+                        volume: kline.volume,
+                        amount: kline.amount,
+                        tradeCount: kline.tradeCount,
+                        allPricesZero: (kline.open == 0 && kline.high == 0 && kline.low == 0 && kline.close == 0)
+                    });
+
+                    // 检查是否是价格为0的数据
+                    const isZeroPriceData = kline.open == 0 && kline.high == 0 && kline.low == 0 && kline.close == 0;
+                    if (isZeroPriceData) {
+                        console.log(`🔍 [FALLBACK] Received zero-price K-line data - processing anyway:`, {
+                            symbol: kline.symbol,
+                            timeframe: kline.timeframe,
+                            timestamp: kline.timestamp,
+                            volume: kline.volume
+                        });
+                    }
+
+                    this.updateChart(kline);
+                } catch (error) {
+                    console.error(`❌ [FALLBACK] Error parsing K-line message:`, error);
+                    console.error(`❌ [FALLBACK] Problematic message body:`, message.body);
+                }
             });
 
             const subscriptionData = {
@@ -213,6 +257,15 @@ class FallbackKlineChart {
                     price: price,
                     originalTimestamp: kline.timestamp
                 });
+
+                // 更新最后已知价格（用于心跳数据）
+                if (price > 0) {
+                    this.lastKnownPrice = price;
+                } else if (this.lastKnownPrice && this.lastKnownPrice > 0) {
+                    // 如果价格为0（心跳数据），使用最后已知价格
+                    price = this.lastKnownPrice;
+                    console.log(`💓 [FALLBACK] Using last known price ${price} for heartbeat data`);
+                }
 
                 // Add new data point
                 this.chart.data.labels.push(timestamp);

@@ -93,19 +93,67 @@ public class KlineService {
     public List<Kline> getKlineData(String symbol, String timeframe, int limit) {
         Map<String, Map<Long, Kline>> symbolData = klineData.get(symbol);
         if (symbolData == null) {
-            return Collections.emptyList();
+            // 如果没有数据，生成最近的几个空K线周期作为初始化数据
+            return generateInitialEmptyKlines(symbol, timeframe, Math.min(limit, 10));
         }
 
         Map<Long, Kline> timeframeData = symbolData.get(timeframe);
         if (timeframeData == null) {
-            return Collections.emptyList();
+            // 如果该时间框架没有数据，生成初始化空K线
+            log.info("📊 No {} data found for {}, generating initial empty K-line periods", timeframe, symbol);
+            return generateInitialEmptyKlines(symbol, timeframe, Math.min(limit, 10));
         }
 
-        // Return sorted K-lines (oldest first) limited to specified count - 返回排序的K线（最旧的优先）限制到指定数量
-        return timeframeData.values().stream()
+        List<Kline> existingData = timeframeData.values().stream()
                 .sorted(Comparator.comparingLong(Kline::getTimestamp))
                 .skip(Math.max(0, timeframeData.size() - limit))
                 .collect(Collectors.toList());
+
+        // 如果现有数据少于要求，补充一些空K线
+        if (existingData.size() < 5) {
+            List<Kline> emptyKlines = generateInitialEmptyKlines(symbol, timeframe, 10 - existingData.size());
+            List<Kline> combined = new ArrayList<>();
+            combined.addAll(emptyKlines);
+            combined.addAll(existingData);
+            return combined;
+        }
+
+        return existingData;
+    }
+
+    /**
+     * Generate initial empty K-line data for visualization - 生成用于可视化的初始空K线数据
+     */
+    private List<Kline> generateInitialEmptyKlines(String symbol, String timeframe, int count) {
+        List<Kline> emptyKlines = new ArrayList<>();
+        Long intervalSeconds = TIMEFRAMES.get(timeframe);
+        if (intervalSeconds == null) {
+            intervalSeconds = 60L; // 默认1分钟
+        }
+
+        long currentTime = System.currentTimeMillis();
+
+        for (int i = count - 1; i >= 0; i--) {
+            long klineTime = currentTime - (i * intervalSeconds * 1000);
+            long alignedTimestamp = alignToInterval(klineTime, intervalSeconds);
+
+            Kline emptyKline = Kline.builder()
+                .symbol(symbol)
+                .timeframe(timeframe)
+                .timestamp(alignedTimestamp)
+                .open(BigDecimal.ZERO)
+                .high(BigDecimal.ZERO)
+                .low(BigDecimal.ZERO)
+                .close(BigDecimal.ZERO)
+                .volume(BigDecimal.ZERO)
+                .amount(BigDecimal.ZERO)
+                .tradeCount(0)
+                .build();
+
+            emptyKlines.add(emptyKline);
+        }
+
+        return emptyKlines;
     }
 
     /**

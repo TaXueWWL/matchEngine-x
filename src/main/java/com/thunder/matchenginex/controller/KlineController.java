@@ -27,10 +27,18 @@ public class KlineController {
             @RequestParam(defaultValue = "1m") String timeframe,
             @RequestParam(defaultValue = "100") int limit) {
 
-        log.debug("Getting K-line data for symbol: {}, timeframe: {}, limit: {}", symbol, timeframe, limit);
+        log.info("📡 API Request: Getting K-line data for symbol: {}, timeframe: {}, limit: {}", symbol, timeframe, limit);
 
         List<Kline> klines = klineService.getKlineData(symbol, timeframe, limit);
-        log.info("K-line data for symbol: {}, klines: {}", symbol, klines);
+
+        if (klines.isEmpty()) {
+            log.info("📊 No historical K-line data for symbol: {}, timeframe: {} - returning empty array (real-time will start on first trade)", symbol, timeframe);
+        } else {
+            log.info("✅ Found {} K-line records for symbol: {}, timeframe: {}", klines.size(), symbol, timeframe);
+            log.debug("📊 First K-line: {}", klines.get(0));
+            log.debug("📊 Last K-line: {}", klines.get(klines.size() - 1));
+        }
+
         return ResponseEntity.ok(klines);
     }
 

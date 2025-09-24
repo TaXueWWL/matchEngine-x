@@ -112,26 +112,56 @@ function connectWebSocket() {
             });
 
             stompClient.onConnect = function(frame) {
-                console.log('WebSocket connected:', frame);
+                console.log('✅ WebSocket connected successfully:', frame);
+                console.log('🔍 Connection frame details:', {
+                    command: frame.command,
+                    headers: frame.headers,
+                    body: frame.body
+                });
                 updateConnectionStatus(true);
                 subscribeToUpdates();
 
                 // Initialize or enable K-line chart with WebSocket connection - 使用WebSocket连接初始化或启用K线图
                 if (window.location.pathname === '/trading') {
                     console.log('🔗 Trading page detected, setting up K-line WebSocket integration...');
+
+                    // 检查WebSocket客户端状态
+                    console.log('🔍 STOMP client state check:', {
+                        connected: stompClient.connected,
+                        state: stompClient.state,
+                        connectionId: stompClient.connectionId || 'unknown'
+                    });
+
                     setTimeout(() => {
                         console.log('🔗 WebSocket delay completed, checking K-line chart status...');
                         console.log('🔗 K-line chart exists:', !!klineChart);
+                        console.log('🔗 Global klineChart reference:', klineChart);
+
                         if (klineChart) {
+                            console.log('🔗 K-line chart type:', klineChart.constructor.name);
                             console.log('🔗 K-line chart methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(klineChart)));
+                            console.log('🔗 Current chart symbol/timeframe:', {
+                                symbol: klineChart.symbol,
+                                timeframe: klineChart.timeframe
+                            });
                         }
 
                         // Enable real-time updates for existing K-line chart
                         if (klineChart && typeof klineChart.enableRealtimeUpdates === 'function') {
                             console.log('🚀 Enabling real-time updates for existing K-line chart');
+                            console.log('🔍 Passing STOMP client to K-line chart:', {
+                                hasStompClient: !!stompClient,
+                                isConnected: stompClient.connected,
+                                state: stompClient.state
+                            });
                             klineChart.enableRealtimeUpdates(stompClient);
                         } else {
-                            console.log('⚠️ K-line chart not found or method not available, chart should have been initialized on page load');
+                            console.log('⚠️ K-line chart not found or method not available');
+                            console.log('🔍 Available global objects:', {
+                                klineChart: !!klineChart,
+                                priceChart: !!priceChart,
+                                window_klineChart: !!window.klineChart
+                            });
                         }
                     }, 500);
                 } else {
@@ -1220,3 +1250,49 @@ function updateCurrentPrice(priceData) {
         previousPrice = currentPrice;
     }
 }
+
+// Debug function to test WebSocket K-line connection manually
+function testKlineWebSocket() {
+    console.log('🧪 Manual K-line WebSocket test initiated');
+    console.log('🔍 Current state:', {
+        stompClient: !!stompClient,
+        connected: stompClient ? stompClient.connected : false,
+        state: stompClient ? stompClient.state : 'null',
+        klineChart: !!klineChart,
+        currentSymbol: currentSymbol
+    });
+
+    if (stompClient && stompClient.connected && klineChart) {
+        console.log('🧪 Manually triggering K-line subscription test...');
+
+        // Test direct subscription
+        const testTopic = `/topic/kline/${currentSymbol}/1m`;
+        console.log(`🧪 Testing direct subscription to: ${testTopic}`);
+
+        const testSub = stompClient.subscribe(testTopic, function(message) {
+            console.log('🧪 TEST: Received message on manual subscription:', message);
+            console.log('🧪 TEST: Message body:', message.body);
+        });
+
+        // Send manual subscription request
+        const testData = {
+            symbol: currentSymbol,
+            timeframe: '1m',
+            sessionId: 'manual_test_' + Date.now()
+        };
+        console.log('🧪 TEST: Sending manual subscription request:', testData);
+        stompClient.send('/app/kline/subscribe', {}, JSON.stringify(testData));
+
+        // Cleanup after 30 seconds
+        setTimeout(() => {
+            console.log('🧪 TEST: Cleaning up manual subscription...');
+            testSub.unsubscribe();
+            stompClient.send('/app/kline/unsubscribe', {}, JSON.stringify(testData));
+        }, 30000);
+    } else {
+        console.warn('🧪 TEST: Cannot run test - WebSocket not connected or K-line chart not available');
+    }
+}
+
+// Make test function available globally
+window.testKlineWebSocket = testKlineWebSocket;
