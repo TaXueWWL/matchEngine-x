@@ -16,7 +16,7 @@ public class PriceLevel {
     public PriceLevel(BigDecimal price) {
         this.price = price;
         this.totalQuantity = BigDecimal.ZERO;
-        // ArrayDeque provides better cache locality and performance than LinkedList
+        // ArrayDeque provides better cache locality and performance than LinkedList - ArrayDeque比LinkedList提供更好的缓存局部性和性能
         this.orders = new ArrayDeque<>();
     }
 
