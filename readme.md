@@ -371,7 +371,7 @@ klineChart.addCandlestickSeries is not a function 错误表明：
 - 实时用户余额更新
 
 # todo
-- 修复bug，订单簿展示
+- √ 修复bug，订单簿展示
 - k线展示
 - 数据结构优化 agrona
 - 订单的状态数量异步写入mysql or redis

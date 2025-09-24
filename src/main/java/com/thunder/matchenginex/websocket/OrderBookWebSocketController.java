@@ -8,12 +8,16 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.beans.factory.annotation.Autowired;
+import javax.annotation.PostConstruct;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
 import java.math.BigDecimal;
+import java.util.concurrent.ScheduledFuture;
 
 @Slf4j
 @Controller
@@ -29,48 +33,64 @@ public class OrderBookWebSocketController {
     // Cache to track last sent price to avoid unnecessary updates
     private final Map<String, BigDecimal> lastPrice = new ConcurrentHashMap<>();
 
+    // Track actual last trade prices for each symbol
+    private final Map<String, BigDecimal> lastTradePrice = new ConcurrentHashMap<>();
+
     // Track active symbols that have subscriptions
     private final Set<String> activeSymbols = new HashSet<>();
 
+    // Individual schedulers for each symbol to prevent thread conflicts
+    private final Map<String, ScheduledFuture<?>> symbolSchedulers = new ConcurrentHashMap<>();
+
+    @Autowired
+    private ThreadPoolTaskScheduler taskScheduler;
+
+    @PostConstruct
+    public void initializeSchedulers() {
+        log.info("OrderBook WebSocket controller initialized with task scheduler");
+    }
+
     /**
-     * Periodically push order book updates to subscribed clients
+     * Start individual scheduler for a symbol
      */
-    @Scheduled(fixedRate = 100) // Push every 1 second
-    public void pushOrderBookUpdates() {
+    private void startSymbolScheduler(String symbol) {
+        if (symbolSchedulers.containsKey(symbol)) {
+            return; // Already scheduled
+        }
+
+        ScheduledFuture<?> scheduledTask = taskScheduler.scheduleAtFixedRate(
+            () -> pushUpdatesForSymbol(symbol),
+            1000 // 1 second interval
+        );
+
+        symbolSchedulers.put(symbol, scheduledTask);
+        log.info("Started scheduler for symbol: {}", symbol);
+    }
+
+    /**
+     * Push order book and price updates for a specific symbol
+     */
+    private void pushUpdatesForSymbol(String symbol) {
         try {
-            // Get all available symbols from trading service
-            Set<String> allSymbols = tradingService.getAllActiveSymbols();
+            OrderBook orderBook = tradingService.getOrderBook(symbol);
+            if (orderBook != null && orderBook.getTotalOrders() > 0) {
+                // Create a simple hash to check if order book changed
+                String currentHash = createOrderBookHash(orderBook);
+                String lastHash = lastOrderBookHash.get(symbol);
 
-            // Add default symbols if none are found
-            if (allSymbols.isEmpty()) {
-                allSymbols = Set.of("BTCUSDT", "ETHUSDT", "ADAUSDT");
-            }
-
-            for (String symbol : allSymbols) {
-                try {
-                    OrderBook orderBook = tradingService.getOrderBook(symbol);
-                    if (orderBook != null && orderBook.getTotalOrders() > 0) {
-                        // Create a simple hash to check if order book changed
-                        String currentHash = createOrderBookHash(orderBook);
-                        String lastHash = lastOrderBookHash.get(symbol);
-
-                        // Only send if order book changed
-                        if (!currentHash.equals(lastHash)) {
-                            OrderBookDto orderBookDto = convertToOrderBookDto(orderBook, symbol);
-                            messagingTemplate.convertAndSend("/topic/orderbook/" + symbol, orderBookDto);
-                            lastOrderBookHash.put(symbol, currentHash);
-                            log.debug("Pushed order book update for {}", symbol);
-                        }
-
-                        // Push latest trade price if available and changed
-                        pushLatestPriceUpdate(symbol, orderBook);
-                    }
-                } catch (Exception e) {
-                    log.error("Error pushing order book update for symbol {}", symbol, e);
+                // Only send if order book changed
+                if (!currentHash.equals(lastHash)) {
+                    OrderBookDto orderBookDto = convertToOrderBookDto(orderBook, symbol);
+                    messagingTemplate.convertAndSend("/topic/orderbook/" + symbol, orderBookDto);
+                    lastOrderBookHash.put(symbol, currentHash);
+                    log.debug("Pushed order book update for {}", symbol);
                 }
+
+                // Push latest trade price if available and changed
+                pushLatestPriceUpdate(symbol, orderBook);
             }
         } catch (Exception e) {
-            log.error("Error in pushOrderBookUpdates", e);
+            log.error("Error pushing updates for symbol {}", symbol, e);
         }
     }
 
@@ -79,7 +99,7 @@ public class OrderBookWebSocketController {
      */
     private void pushLatestPriceUpdate(String symbol, OrderBook orderBook) {
         try {
-            BigDecimal currentLastPrice = getLatestTradePrice(orderBook);
+            BigDecimal currentLastPrice = getLatestTradePrice(symbol, orderBook);
             if (currentLastPrice != null) {
                 BigDecimal lastSentPrice = lastPrice.get(symbol);
 
@@ -102,24 +122,43 @@ public class OrderBookWebSocketController {
     }
 
     /**
-     * Get the latest trade price from order book
-     * This is a simplified implementation - in a real system, you'd track actual trades
+     * Get the latest trade price based on correct market logic
+     * For taker orders:
+     * - Buy taker (price >= best ask): trade price = best ask price
+     * - Sell taker (price <= best bid): trade price = best bid price
+     *
+     * Since we don't have actual trade execution info here, we use order book state
+     * to determine the likely trade price
      */
-    private BigDecimal getLatestTradePrice(OrderBook orderBook) {
-        // For now, use mid price between best bid and ask as approximation
-        // In a real implementation, you'd track actual executed trades
+    private BigDecimal getLatestTradePrice(String symbol, OrderBook orderBook) {
         BigDecimal bestBid = orderBook.getBestBuyPrice();
         BigDecimal bestAsk = orderBook.getBestSellPrice();
 
-        if (bestBid != null && bestAsk != null) {
-            return bestBid.add(bestAsk).divide(BigDecimal.valueOf(2), 2, java.math.RoundingMode.HALF_UP);
-        } else if (bestBid != null) {
+        // If we have a stored last trade price, use it as priority
+        BigDecimal storedLastPrice = lastTradePrice.get(symbol);
+        if (storedLastPrice != null) {
+            return storedLastPrice;
+        }
+
+        if (bestBid != null) {
+            // Only bid exists - likely price for sell takers
             return bestBid;
-        } else if (bestAsk != null) {
+        }
+        if (bestAsk != null) {
+            // Only ask exists - likely price for buy takers
             return bestAsk;
         }
 
         return null;
+    }
+
+    /**
+     * Update last trade price when a trade occurs
+     * This would be called from the trading engine when actual trades happen
+     */
+    public void updateLastTradePrice(String symbol, BigDecimal tradePrice) {
+        lastTradePrice.put(symbol, tradePrice);
+        log.debug("Updated last trade price for {}: {}", symbol, tradePrice);
     }
 
     /**
@@ -149,11 +188,17 @@ public class OrderBookWebSocketController {
             log.info("Client subscribed to order book for {}", symbol);
             activeSymbols.add(symbol);
 
+            // Start individual scheduler for this symbol
+            startSymbolScheduler(symbol);
+
             // Send immediate update
             OrderBook orderBook = tradingService.getOrderBook(symbol);
             if (orderBook != null) {
                 OrderBookDto orderBookDto = convertToOrderBookDto(orderBook, symbol);
                 messagingTemplate.convertAndSend("/topic/orderbook/" + symbol, orderBookDto);
+
+                // Also send immediate price update
+                pushLatestPriceUpdate(symbol, orderBook);
             }
         } catch (Exception e) {
             log.error("Error subscribing to order book for {}", symbol, e);

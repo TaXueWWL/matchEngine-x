@@ -12,6 +12,8 @@ import com.thunder.matchenginex.orderbook.PriceLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -26,6 +28,11 @@ public class MatchingEngine {
 
     private final OrderBookManager orderBookManager;
     private final AtomicLong tradeIdGenerator = new AtomicLong(1);
+
+    // Lazy injection to avoid circular dependency
+    @Autowired
+    @Lazy
+    private com.thunder.matchenginex.websocket.OrderBookWebSocketController webSocketController;
 
     public void placeOrder(Command command) {
         Order order = createOrderFromCommand(command);
@@ -208,7 +215,7 @@ public class MatchingEngine {
 
             BigDecimal tradeQuantity = incomingOrder.getRemainingQuantity()
                     .min(bestOrder.getRemainingQuantity());
-            BigDecimal tradePrice = bestOrder.getPrice(); // Price priority
+            BigDecimal tradePrice = bestOrder.getPrice(); // Price priority - this is the actual trade price
 
             // Create trade
             Trade trade = createTrade(incomingOrder, bestOrder, tradePrice, tradeQuantity);
@@ -217,6 +224,16 @@ public class MatchingEngine {
             // Update orders
             incomingOrder.fill(tradeQuantity);
             bestOrder.fill(tradeQuantity);
+
+            // Update last trade price for WebSocket push
+            // The trade price is determined by the maker order (bestOrder) price
+            // This follows the correct logic:
+            // - For buy taker: trade price = sell maker price (ask price)
+            // - For sell taker: trade price = buy maker price (bid price)
+            if (webSocketController != null) {
+                webSocketController.updateLastTradePrice(incomingOrder.getSymbol(), tradePrice);
+                log.debug("Updated last trade price for {}: {}", incomingOrder.getSymbol(), tradePrice);
+            }
 
             // Remove fully filled order from order book
             if (bestOrder.isFullyFilled()) {

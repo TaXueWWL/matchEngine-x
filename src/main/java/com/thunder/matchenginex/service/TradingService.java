@@ -13,6 +13,8 @@ import com.thunder.matchenginex.service.AccountService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -403,4 +405,5 @@ public class TradingService {
 
         return activeSymbols;
     }
+
 }
