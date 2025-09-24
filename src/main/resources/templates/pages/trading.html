@@ -235,6 +235,91 @@
             </div>
         </div>
     </div>
+
+    <!-- Current Orders Section -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list me-2"></i>
+                        当前订单
+                    </h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadCurrentOrders()">
+                        <i class="fas fa-refresh me-1"></i>刷新
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>订单ID</th>
+                                    <th>交易对</th>
+                                    <th>方向</th>
+                                    <th>类型</th>
+                                    <th>价格</th>
+                                    <th>数量</th>
+                                    <th>已成交</th>
+                                    <th>状态</th>
+                                    <th>时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="current-orders-body">
+                                <tr>
+                                    <td colspan="10" class="text-center text-muted py-4">
+                                        <div class="spinner-border spinner-border-sm" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2 mb-0">正在加载当前订单...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modify Order Modal -->
+<div class="modal fade" id="modifyOrderModal" tabindex="-1" aria-labelledby="modifyOrderModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modifyOrderModalLabel">修改订单</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="modify-order-form">
+                    <div class="mb-3">
+                        <label for="modify-order-id" class="form-label">订单ID</label>
+                        <input type="text" class="form-control" id="modify-order-id" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="modify-order-symbol" class="form-label">交易对</label>
+                        <input type="text" class="form-control" id="modify-order-symbol" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="modify-order-price" class="form-label">新价格</label>
+                        <input type="number" class="form-control" id="modify-order-price"
+                               step="0.01" min="0" placeholder="0.00" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="modify-order-quantity" class="form-label">新数量</label>
+                        <input type="number" class="form-control" id="modify-order-quantity"
+                               step="0.001" min="0" placeholder="0.000" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitModifyOrder()">确认修改</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Scripts Fragment -->

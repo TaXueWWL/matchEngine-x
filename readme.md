@@ -215,3 +215,54 @@ docker run -p 8080:8080 -p 9090:9090 matchengine-x
 - 修复bug，订单簿展示
 - k线展示
 - 数据结构优化 agrona
+
+
+1. ✅ 后端获取用户订单列表接口
+
+- TradingService: 添加了 getUserOrders() 和 getAllUserOrders() 方法
+- OrderBook: 添加了 getUserOrders() 方法，按时间戳排序返回用户订单
+- TradingController: 添加了 GET /api/trading/orders/user/{userId} 接口
+
+2. ✅ 前端订单簿实时更新
+
+- 修改了 updateOrderBook() 函数，兼容REST API和WebSocket两种数据格式
+- 支持 buyLevels/sellLevels (REST API) 和 bids/asks (WebSocket)
+- 改进了数据格式化和显示
+
+3. ✅ 当前订单列表展示
+
+- 页面布局: 在trading页面添加了完整的当前订单列表区域
+- 数据加载: 实现了 loadCurrentOrders() 和 updateCurrentOrders() 函数
+- 状态显示: 包含订单状态、方向、价格、数量、已成交量等信息
+- 实时刷新: 下单后自动刷新当前订单列表
+
+4. ✅ 撤单功能
+
+- 后端接口: 使用现有的 DELETE /api/trading/orders/{orderId} 接口
+- 前端实现: cancelOrder() 函数，包含确认对话框和错误处理
+- 界面集成: 在订单列表中显示撤单按钮（仅对可撤销订单）
+
+5. ✅ 改单功能
+
+- 页面UI: 添加了Bootstrap模态框用于修改订单
+- 前端功能:
+    - showModifyOrderDialog() - 显示修改对话框
+    - submitModifyOrder() - 提交修改请求
+- 后端接口: 使用现有的 PUT /api/trading/orders/{orderId} 接口
+
+关键特性：
+
+1. 完整的订单生命周期管理: 下单 → 查看 → 修改 → 撤销
+2. 实时数据更新: 所有操作后自动刷新相关数据
+3. 用户友好的界面:
+   - 状态徽章显示订单状态
+   - 颜色区分买卖方向
+   - 操作按钮仅对可操作订单显示
+4. 错误处理: 完整的错误提示和异常处理
+5. 数据一致性: 操作后同时刷新订单列表、余额等相关数据
+
+现在交易页面具备了完整的订单管理功能，用户可以：
+- 实时查看当前所有未完成订单
+- 方便地撤销不需要的订单
+- 快速修改订单价格和数量
+- 看到订单簿的实时变化

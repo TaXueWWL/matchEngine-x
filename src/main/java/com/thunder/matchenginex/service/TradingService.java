@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -148,6 +149,24 @@ public class TradingService {
 
     public TradingPair getTradingPairInfo(String symbol) {
         return tradingPairsConfig.getTradingPair(symbol);
+    }
+
+    public List<Order> getUserOrders(long userId, String symbol) {
+        OrderBook orderBook = orderBookManager.getOrderBook(symbol);
+        return orderBook.getUserOrders(userId);
+    }
+
+    public List<Order> getAllUserOrders(long userId) {
+        List<Order> allOrders = new ArrayList<>();
+        List<String> symbols = getSupportedSymbols();
+
+        for (String symbol : symbols) {
+            OrderBook orderBook = orderBookManager.getOrderBook(symbol);
+            List<Order> userOrders = orderBook.getUserOrders(userId);
+            allOrders.addAll(userOrders);
+        }
+
+        return allOrders;
     }
 
     private void validateTradingPairConstraints(TradingPair tradingPair,

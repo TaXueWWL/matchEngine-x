@@ -199,6 +199,7 @@ function initTradingPage() {
     loadOrderBook();
     loadOrderHistory();
     loadUserBalance();
+    loadCurrentOrders();
     initPriceChart();
 
     // Set up form handlers
@@ -219,27 +220,39 @@ function updateOrderBook(orderBook) {
     const buyOrdersBody = document.getElementById('buy-orders-body');
     const sellOrdersBody = document.getElementById('sell-orders-body');
 
-    if (buyOrdersBody && orderBook.bids) {
+    // Handle both API response formats (buyLevels/sellLevels from REST API, bids/asks from WebSocket)
+    const buyLevels = orderBook.buyLevels || orderBook.bids || [];
+    const sellLevels = orderBook.sellLevels || orderBook.asks || [];
+
+    if (buyOrdersBody) {
         buyOrdersBody.innerHTML = '';
-        orderBook.bids.slice(0, 10).forEach(bid => {
+        buyLevels.slice(0, 10).forEach(level => {
+            const price = level.price;
+            const quantity = level.totalQuantity || level.quantity;
+            const total = price * quantity;
+
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td class="buy-order">¥${bid.price}</td>
-                <td>${bid.quantity}</td>
-                <td>¥${(bid.price * bid.quantity).toFixed(2)}</td>
+                <td class="buy-order">¥${parseFloat(price).toFixed(2)}</td>
+                <td>${parseFloat(quantity).toFixed(6)}</td>
+                <td>¥${total.toFixed(2)}</td>
             `;
             buyOrdersBody.appendChild(row);
         });
     }
 
-    if (sellOrdersBody && orderBook.asks) {
+    if (sellOrdersBody) {
         sellOrdersBody.innerHTML = '';
-        orderBook.asks.slice(0, 10).forEach(ask => {
+        sellLevels.slice(0, 10).forEach(level => {
+            const price = level.price;
+            const quantity = level.totalQuantity || level.quantity;
+            const total = price * quantity;
+
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td class="sell-order">¥${ask.price}</td>
-                <td>${ask.quantity}</td>
-                <td>¥${(ask.price * ask.quantity).toFixed(2)}</td>
+                <td class="sell-order">¥${parseFloat(price).toFixed(2)}</td>
+                <td>${parseFloat(quantity).toFixed(6)}</td>
+                <td>¥${total.toFixed(2)}</td>
             `;
             sellOrdersBody.appendChild(row);
         });
@@ -301,6 +314,7 @@ function placeOrder(side) {
             // Refresh data
             loadOrderHistory();
             loadUserBalance();
+            loadCurrentOrders();
         } else {
             alert(`订单提交失败: ${data.message || '未知错误'}`);
         }
@@ -438,6 +452,133 @@ function updateTradeHistory(trades) {
 }
 
 // Add balance functionality
+function loadCurrentOrders() {
+    fetch(`/api/trading/orders/user/${currentUserId}?symbol=${currentSymbol}`)
+        .then(response => response.json())
+        .then(orders => {
+            updateCurrentOrders(orders);
+        })
+        .catch(error => {
+            console.error('Error loading current orders:', error);
+            const tbody = document.getElementById('current-orders-body');
+            if (tbody) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="10" class="text-center text-muted">
+                            加载订单失败，请重试
+                        </td>
+                    </tr>
+                `;
+            }
+        });
+}
+
+function updateCurrentOrders(orders) {
+    const tbody = document.getElementById('current-orders-body');
+    if (!tbody) return;
+
+    if (orders.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="10" class="text-center text-muted">
+                    暂无当前订单
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = '';
+    orders.forEach(order => {
+        const row = document.createElement('tr');
+        const sideClass = order.side === 'BUY' ? 'text-success' : 'text-danger';
+        const sideText = order.side === 'BUY' ? '买入' : '卖出';
+        const statusClass = getStatusClass(order.status);
+        const statusText = getStatusText(order.status);
+
+        row.innerHTML = `
+            <td>${order.orderId}</td>
+            <td>${order.symbol}</td>
+            <td class="${sideClass}">${sideText}</td>
+            <td>${order.type}</td>
+            <td>¥${parseFloat(order.price).toFixed(2)}</td>
+            <td>${parseFloat(order.quantity).toFixed(6)}</td>
+            <td>${parseFloat(order.filledQuantity).toFixed(6)}</td>
+            <td><span class="badge ${statusClass}">${statusText}</span></td>
+            <td>${formatTimestamp(order.timestamp)}</td>
+            <td>
+                <div class="btn-group btn-group-sm" role="group">
+                    ${order.status === 'NEW' || order.status === 'PARTIALLY_FILLED' ? `
+                        <button class="btn btn-outline-warning btn-sm"
+                                onclick="showModifyOrderDialog(${order.orderId}, '${order.symbol}', ${order.price}, ${order.remainingQuantity})"
+                                title="修改订单">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm"
+                                onclick="cancelOrder(${order.orderId}, '${order.symbol}')"
+                                title="取消订单">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function getStatusClass(status) {
+    switch (status) {
+        case 'NEW': return 'bg-primary';
+        case 'PARTIALLY_FILLED': return 'bg-info';
+        case 'FILLED': return 'bg-success';
+        case 'CANCELLED': return 'bg-secondary';
+        case 'REJECTED': return 'bg-danger';
+        default: return 'bg-secondary';
+    }
+}
+
+function getStatusText(status) {
+    switch (status) {
+        case 'NEW': return '新订单';
+        case 'PARTIALLY_FILLED': return '部分成交';
+        case 'FILLED': return '完全成交';
+        case 'CANCELLED': return '已取消';
+        case 'REJECTED': return '已拒绝';
+        default: return status;
+    }
+}
+
+function formatTimestamp(timestamp) {
+    return new Date(timestamp).toLocaleString('zh-CN');
+}
+
+function cancelOrder(orderId, symbol) {
+    if (!confirm('确定要取消这个订单吗？')) {
+        return;
+    }
+
+    fetch(`/api/trading/orders/${orderId}?symbol=${symbol}&userId=${currentUserId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('订单取消成功！');
+            // 刷新当前订单列表
+            loadCurrentOrders();
+            // 刷新余额
+            loadUserBalance();
+        } else {
+            alert('订单取消失败: ' + (data.message || '未知错误'));
+        }
+    })
+    .catch(error => {
+        console.error('Error canceling order:', error);
+        alert('订单取消失败，请重试');
+    });
+}
+
 function addBalance() {
     const currency = document.getElementById('add-currency').value;
     const amount = document.getElementById('add-amount').value;
@@ -486,4 +627,62 @@ function formatNumber(num, decimals = 2) {
 
 function formatCurrency(amount, currency = '¥') {
     return currency + formatNumber(amount);
+}
+
+function showModifyOrderDialog(orderId, symbol, currentPrice, currentQuantity) {
+    // 填充表单数据
+    document.getElementById('modify-order-id').value = orderId;
+    document.getElementById('modify-order-symbol').value = symbol;
+    document.getElementById('modify-order-price').value = currentPrice;
+    document.getElementById('modify-order-quantity').value = currentQuantity;
+
+    // 显示对话框
+    const modal = new bootstrap.Modal(document.getElementById('modifyOrderModal'));
+    modal.show();
+}
+
+function submitModifyOrder() {
+    const orderId = document.getElementById('modify-order-id').value;
+    const symbol = document.getElementById('modify-order-symbol').value;
+    const newPrice = document.getElementById('modify-order-price').value;
+    const newQuantity = document.getElementById('modify-order-quantity').value;
+
+    if (!newPrice || !newQuantity) {
+        alert('请填写新价格和新数量');
+        return;
+    }
+
+    const modifyData = {
+        symbol: symbol,
+        userId: currentUserId,
+        newPrice: newPrice,
+        newQuantity: newQuantity
+    };
+
+    fetch(`/api/trading/orders/${orderId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(modifyData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('订单修改成功！');
+            // 关闭对话框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modifyOrderModal'));
+            modal.hide();
+            // 刷新当前订单列表
+            loadCurrentOrders();
+            // 刷新余额
+            loadUserBalance();
+        } else {
+            alert('订单修改失败: ' + (data.message || '未知错误'));
+        }
+    })
+    .catch(error => {
+        console.error('Error modifying order:', error);
+        alert('订单修改失败，请重试');
+    });
 }

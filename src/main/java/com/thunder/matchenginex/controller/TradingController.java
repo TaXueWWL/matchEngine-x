@@ -208,6 +208,30 @@ public class TradingController {
         }
     }
 
+    @GetMapping("/orders/user/{userId}")
+    public ResponseEntity<List<OrderDto>> getUserOrders(
+            @PathVariable Long userId,
+            @RequestParam(required = false) String symbol) {
+        try {
+            List<Order> orders;
+            if (symbol != null && !symbol.isEmpty()) {
+                orders = tradingService.getUserOrders(userId, symbol);
+            } else {
+                orders = tradingService.getAllUserOrders(userId);
+            }
+
+            List<OrderDto> orderDtos = orders.stream()
+                    .map(this::convertToOrderDto)
+                    .toList();
+
+            return ResponseEntity.ok(orderDtos);
+
+        } catch (Exception e) {
+            log.error("Error getting user orders: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     private OrderDto convertToOrderDto(Order order) {
         return OrderDto.builder()
                 .orderId(order.getOrderId())

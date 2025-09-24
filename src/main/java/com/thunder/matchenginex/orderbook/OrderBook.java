@@ -140,4 +140,19 @@ public class OrderBook {
         }
         return null;
     }
+
+    public List<Order> getUserOrders(long userId) {
+        List<Order> userOrders = new ArrayList<>();
+
+        for (Order order : orderMap.values()) {
+            if (order.getUserId() == userId) {
+                userOrders.add(order);
+            }
+        }
+
+        // Sort by timestamp (newest first)
+        userOrders.sort((o1, o2) -> Long.compare(o2.getTimestamp(), o1.getTimestamp()));
+
+        return userOrders;
+    }
 }
