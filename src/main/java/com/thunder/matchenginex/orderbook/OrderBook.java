@@ -28,6 +28,9 @@ public class OrderBook {
     // Track price level for each order for fast removal
     private final Map<Long, PriceLevel> orderToPriceLevelMap = new ConcurrentHashMap<>();
 
+    // Historical orders (completed orders: FILLED, CANCELLED, REJECTED)
+    private final MutableLongObjectMap<Order> historicalOrders = new LongObjectHashMap<>();
+
     public OrderBook(String symbol) {
         this.symbol = symbol;
     }
@@ -141,10 +144,23 @@ public class OrderBook {
         return null;
     }
 
+    public void addHistoricalOrder(Order order) {
+        historicalOrders.put(order.getOrderId(), order);
+        log.debug("Added order {} to historical orders with status {}", order.getOrderId(), order.getStatus());
+    }
+
     public List<Order> getUserOrders(long userId) {
         List<Order> userOrders = new ArrayList<>();
 
+        // Get active orders
         for (Order order : orderMap.values()) {
+            if (order.getUserId() == userId) {
+                userOrders.add(order);
+            }
+        }
+
+        // Get historical orders
+        for (Order order : historicalOrders.values()) {
             if (order.getUserId() == userId) {
                 userOrders.add(order);
             }
@@ -154,5 +170,24 @@ public class OrderBook {
         userOrders.sort((o1, o2) -> Long.compare(o2.getTimestamp(), o1.getTimestamp()));
 
         return userOrders;
+    }
+
+    public List<Order> getUserHistoricalOrders(long userId) {
+        List<Order> userOrders = new ArrayList<>();
+
+        for (Order order : historicalOrders.values()) {
+            if (order.getUserId() == userId) {
+                userOrders.add(order);
+            }
+        }
+
+        // Sort by timestamp (newest first)
+        userOrders.sort((o1, o2) -> Long.compare(o2.getTimestamp(), o1.getTimestamp()));
+
+        return userOrders;
+    }
+
+    public Order getHistoricalOrder(long orderId) {
+        return historicalOrders.get(orderId);
     }
 }

@@ -34,6 +34,14 @@ public class MatchingEngine {
     @Lazy
     private com.thunder.matchenginex.websocket.OrderBookWebSocketController webSocketController;
 
+    @Autowired
+    @Lazy
+    private com.thunder.matchenginex.service.AccountService accountService;
+
+    @Autowired
+    @Lazy
+    private com.thunder.matchenginex.util.CurrencyUtils currencyUtils;
+
     public void placeOrder(Command command) {
         Order order = createOrderFromCommand(command);
         OrderBook orderBook = orderBookManager.getOrderBook(command.getSymbol());
@@ -67,12 +75,29 @@ public class MatchingEngine {
 
     public void cancelOrder(Command command) {
         OrderBook orderBook = orderBookManager.getOrderBook(command.getSymbol());
+        Order order = orderBook.getOrder(command.getOrderId());
+
+        if (order == null) {
+            log.warn("Order not found for cancellation: {}", command.getOrderId());
+            return;
+        }
+
+        // Set order status to cancelled
+        order.cancel();
+
+        // Remove from order book
         boolean removed = orderBook.removeOrder(command.getOrderId());
 
         if (removed) {
-            log.info("Cancelled order: {}", command.getOrderId());
+            // Release frozen funds for the cancelled order
+            releaseFrozenFunds(command.getSymbol(), order);
+
+            // Add cancelled order to historical orders
+            orderBook.addHistoricalOrder(order);
+
+            log.info("Cancelled order: {} and released frozen funds", command.getOrderId());
         } else {
-            log.warn("Order not found for cancellation: {}", command.getOrderId());
+            log.warn("Failed to remove order from order book: {}", command.getOrderId());
         }
     }
 
@@ -152,6 +177,11 @@ public class MatchingEngine {
         }
 
         processTrades(trades);
+
+        // Add taker order to historical orders if fully filled
+        if (order.getStatus() == OrderStatus.FILLED) {
+            orderBook.addHistoricalOrder(order);
+        }
     }
 
     private void processMarketOrder(OrderBook orderBook, Order order) {
@@ -165,6 +195,11 @@ public class MatchingEngine {
         }
 
         processTrades(trades);
+
+        // Add market order to historical orders if fully filled or cancelled
+        if (order.getStatus() == OrderStatus.FILLED || order.getStatus() == OrderStatus.CANCELLED) {
+            orderBook.addHistoricalOrder(order);
+        }
     }
 
     private void processIocOrder(OrderBook orderBook, Order order) {
@@ -176,6 +211,11 @@ public class MatchingEngine {
         }
 
         processTrades(trades);
+
+        // Add IOC order to historical orders if fully filled or cancelled
+        if (order.getStatus() == OrderStatus.FILLED || order.getStatus() == OrderStatus.CANCELLED) {
+            orderBook.addHistoricalOrder(order);
+        }
     }
 
     private void processFokOrder(OrderBook orderBook, Order order) {
@@ -186,6 +226,11 @@ public class MatchingEngine {
         } else {
             order.setStatus(OrderStatus.CANCELLED);
             log.info("FOK order {} cancelled - cannot fill entire quantity", order.getOrderId());
+        }
+
+        // Add FOK order to historical orders if fully filled or cancelled
+        if (order.getStatus() == OrderStatus.FILLED || order.getStatus() == OrderStatus.CANCELLED) {
+            orderBook.addHistoricalOrder(order);
         }
     }
 
@@ -222,8 +267,12 @@ public class MatchingEngine {
             trades.add(trade);
 
             // Update orders
+            BigDecimal bestOrderOldRemaining = bestOrder.getRemainingQuantity();
             incomingOrder.fill(tradeQuantity);
             bestOrder.fill(tradeQuantity);
+
+            // Update PriceLevel total quantity for the maker order
+            bestLevel.updateQuantity(bestOrder, bestOrderOldRemaining, bestOrder.getRemainingQuantity());
 
             // Update last trade price for WebSocket push
             // The trade price is determined by the maker order (bestOrder) price
@@ -235,9 +284,10 @@ public class MatchingEngine {
                 log.debug("Updated last trade price for {}: {}", incomingOrder.getSymbol(), tradePrice);
             }
 
-            // Remove fully filled order from order book
+            // Remove fully filled order from order book and add to historical orders
             if (bestOrder.isFullyFilled()) {
                 bestLevel.pollFirstOrder();
+                orderBook.addHistoricalOrder(bestOrder); // Add completed maker order to historical orders
                 if (bestLevel.isEmpty()) {
                     if (incomingOrder.getSide() == OrderSide.BUY) {
                         orderBook.getSellLevels().remove(bestLevel.getPrice());
@@ -317,6 +367,53 @@ public class MatchingEngine {
             log.info("Trade executed: ID={}, Symbol={}, Price={}, Quantity={}, BuyOrder={}, SellOrder={}",
                     trade.getTradeId(), trade.getSymbol(), trade.getPrice(), trade.getQuantity(),
                     trade.getBuyOrderId(), trade.getSellOrderId());
+
+            // Execute the actual fund transfer
+            executeFundTransfer(trade);
+        }
+    }
+
+    private void executeFundTransfer(Trade trade) {
+        String baseCurrency = currencyUtils.extractBaseCurrency(trade.getSymbol());
+        String quoteCurrency = currencyUtils.extractQuoteCurrency(trade.getSymbol());
+
+        BigDecimal tradeAmount = trade.getPrice().multiply(trade.getQuantity()); // Total USDT value
+        BigDecimal tradeQuantity = trade.getQuantity(); // BTC quantity
+
+        long buyUserId = trade.getBuyUserId();
+        long sellUserId = trade.getSellUserId();
+
+        // Transfer from buyer to seller: USDT (quote currency)
+        // Unfreeze from buyer and add to seller
+        accountService.unfreezeBalance(buyUserId, quoteCurrency, tradeAmount);
+        accountService.addBalance(sellUserId, quoteCurrency, tradeAmount);
+
+        // Transfer from seller to buyer: BTC (base currency)
+        // Unfreeze from seller and add to buyer
+        accountService.unfreezeBalance(sellUserId, baseCurrency, tradeQuantity);
+        accountService.addBalance(buyUserId, baseCurrency, tradeQuantity);
+
+        log.info("Fund transfer executed: Buy user {} received {} {}, Sell user {} received {} {}",
+                buyUserId, tradeQuantity, baseCurrency,
+                sellUserId, tradeAmount, quoteCurrency);
+    }
+
+    private void releaseFrozenFunds(String symbol, Order order) {
+        if (order.getSide() == OrderSide.BUY) {
+            String quoteCurrency = currencyUtils.extractQuoteCurrency(symbol);
+            // For buy orders, release price * remaining quantity
+            BigDecimal frozenAmount = order.getPrice().multiply(order.getRemainingQuantity());
+
+            accountService.unfreezeBalance(order.getUserId(), quoteCurrency, frozenAmount);
+            log.info("Released frozen balance for cancelled buy order: userId={}, currency={}, amount={}",
+                order.getUserId(), quoteCurrency, frozenAmount);
+        }
+        else if (order.getSide() == OrderSide.SELL) {
+            String baseCurrency = currencyUtils.extractBaseCurrency(symbol);
+            // For sell orders, release remaining quantity
+            accountService.unfreezeBalance(order.getUserId(), baseCurrency, order.getRemainingQuantity());
+            log.info("Released frozen balance for cancelled sell order: userId={}, currency={}, amount={}",
+                order.getUserId(), baseCurrency, order.getRemainingQuantity());
         }
     }
 }

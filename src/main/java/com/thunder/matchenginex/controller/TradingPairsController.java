@@ -19,6 +19,7 @@ import java.util.HashSet;
 public class TradingPairsController {
 
     private final TradingService tradingService;
+    private final com.thunder.matchenginex.util.CurrencyUtils currencyUtils;
 
     @GetMapping
     public ResponseEntity<List<String>> getSupportedSymbols() {
@@ -39,12 +40,10 @@ public class TradingPairsController {
 
             // Extract unique currencies from trading pairs
             for (String symbol : symbols) {
-                // For symbols like BTCUSDT, extract BTC and USDT
-                if (symbol.endsWith("USDT")) {
-                    currencies.add(symbol.substring(0, symbol.length() - 4)); // Base currency
-                    currencies.add("USDT"); // Quote currency
-                }
-                // Add other patterns as needed
+                String baseCurrency = currencyUtils.extractBaseCurrency(symbol);
+                String quoteCurrency = currencyUtils.extractQuoteCurrency(symbol);
+                currencies.add(baseCurrency);
+                currencies.add(quoteCurrency);
             }
 
             return ResponseEntity.ok(currencies.stream().sorted().toList());

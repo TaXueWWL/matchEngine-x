@@ -1,5 +1,6 @@
 package com.thunder.matchenginex.controller;
 
+import com.thunder.matchenginex.constant.TradingConstants;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -23,7 +24,7 @@ public class WebController {
     }
 
     @GetMapping("/trading")
-    public String trading(@RequestParam(value = "symbol", defaultValue = "BTCUSDT") String symbol,
+    public String trading(@RequestParam(value = "symbol", defaultValue = TradingConstants.DEFAULT_SYMBOL) String symbol,
                          Model model, HttpSession session) {
         model.addAttribute("pageTitle", "交易 - " + symbol);
         model.addAttribute("activeMenu", "trading");

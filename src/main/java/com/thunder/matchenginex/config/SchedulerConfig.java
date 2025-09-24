@@ -10,7 +10,7 @@ public class SchedulerConfig {
     @Bean
     public ThreadPoolTaskScheduler taskScheduler() {
         ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
-        scheduler.setPoolSize(20); // Support up to 20 concurrent symbols
+        scheduler.setPoolSize(1); // Support up to 20 concurrent symbols
         scheduler.setThreadNamePrefix("OrderBook-Pusher-");
         scheduler.setWaitForTasksToCompleteOnShutdown(true);
         scheduler.setAwaitTerminationSeconds(30);

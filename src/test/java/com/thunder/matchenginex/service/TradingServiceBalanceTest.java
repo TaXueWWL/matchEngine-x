@@ -5,6 +5,8 @@ import com.thunder.matchenginex.enums.OrderSide;
 import com.thunder.matchenginex.enums.OrderType;
 import com.thunder.matchenginex.event.OrderEventProducer;
 import com.thunder.matchenginex.orderbook.OrderBookManager;
+import com.thunder.matchenginex.util.CurrencyUtils;
+import org.checkerframework.checker.units.qual.C;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +37,7 @@ public class TradingServiceBalanceTest {
 
     private AccountService accountService;
     private TradingService tradingService;
+    private CurrencyUtils currencyUtils;
 
     @BeforeEach
     void setUp() {
@@ -42,9 +45,10 @@ public class TradingServiceBalanceTest {
 
         // 创建真实的AccountService实例
         accountService = new AccountService();
+        currencyUtils = new CurrencyUtils();
 
         // 创建TradingService实例
-        tradingService = new TradingService(eventProducer, orderBookManager, tradingPairsConfig, accountService);
+        tradingService = new TradingService(eventProducer, orderBookManager, tradingPairsConfig, accountService, currencyUtils);
 
         // 设置mock行为
         when(tradingPairsConfig.isValidSymbol(anyString())).thenReturn(true);

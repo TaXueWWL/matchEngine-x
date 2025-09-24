@@ -481,23 +481,15 @@ function updateCurrentPriceFromOrderBook(buyLevels, sellLevels) {
     if (buyLevels.length > 0 && sellLevels.length > 0) {
         const bestBid = parseFloat(buyLevels[0].price);
         const bestAsk = parseFloat(sellLevels[0].price);
-        const midPrice = (bestBid + bestAsk) / 2;
         const spread = ((bestAsk - bestBid) / bestBid * 100);
-
-        if (lastPriceElement) {
-            lastPriceElement.textContent = `¥${midPrice.toFixed(2)}`;
-        }
 
         if (priceLabelElement) {
             priceLabelElement.textContent = `价差: ${spread.toFixed(3)}%`;
         }
+    }
 
-        // Mock price change - in real implementation, this would come from historical data
-        if (priceChangeElement) {
-            const mockChange = (Math.random() - 0.5) * 5; // Random change between -2.5% and +2.5%
-            priceChangeElement.textContent = `${mockChange >= 0 ? '+' : ''}${mockChange.toFixed(2)}%`;
-            priceChangeElement.className = `price-change ms-2 ${mockChange >= 0 ? 'positive' : 'negative'}`;
-        }
+    if (lastPriceElement && !lastPriceElement.textContent.includes('¥')) {
+        lastPriceElement.textContent = '?';
     }
 }
 
