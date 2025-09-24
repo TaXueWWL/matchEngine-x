@@ -58,4 +58,30 @@ public class AccountService {
     public BigDecimal getTotalBalance(Long userId, String currency) {
         return getAccount(userId).getTotalBalance(currency);
     }
+
+    /**
+     * Transfer funds from frozen balance of fromUser to available balance of toUser
+     * Used for trade settlement
+     */
+    public boolean transferFromFrozen(Long fromUserId, Long toUserId, String currency, BigDecimal amount) {
+        Account fromAccount = getAccount(fromUserId);
+        Account toAccount = getAccount(toUserId);
+
+        // Check if fromUser has enough frozen balance
+        if (fromAccount.getFrozenAmount(currency).compareTo(amount) < 0) {
+            log.error("Insufficient frozen balance for transfer: userId={}, currency={}, required={}, frozen={}",
+                    fromUserId, currency, amount, fromAccount.getFrozenAmount(currency));
+            return false;
+        }
+
+        // Remove from sender's frozen balance (don't add to available)
+        fromAccount.getFrozen().merge(currency, amount.negate(), BigDecimal::add);
+
+        // Add to receiver's available balance
+        toAccount.addBalance(currency, amount);
+
+        log.info("Transferred from frozen: from userId={} to userId={}, currency={}, amount={}",
+                fromUserId, toUserId, currency, amount);
+        return true;
+    }
 }

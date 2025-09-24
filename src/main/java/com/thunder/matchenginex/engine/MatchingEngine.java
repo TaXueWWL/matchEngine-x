@@ -9,6 +9,9 @@ import com.thunder.matchenginex.model.Trade;
 import com.thunder.matchenginex.orderbook.OrderBook;
 import com.thunder.matchenginex.orderbook.OrderBookManager;
 import com.thunder.matchenginex.orderbook.PriceLevel;
+import com.thunder.matchenginex.service.AccountService;
+import com.thunder.matchenginex.util.CurrencyUtils;
+import com.thunder.matchenginex.websocket.OrderBookWebSocketController;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -32,15 +35,15 @@ public class MatchingEngine {
     // Lazy injection to avoid circular dependency
     @Autowired
     @Lazy
-    private com.thunder.matchenginex.websocket.OrderBookWebSocketController webSocketController;
+    private OrderBookWebSocketController webSocketController;
 
     @Autowired
     @Lazy
-    private com.thunder.matchenginex.service.AccountService accountService;
+    private AccountService accountService;
 
     @Autowired
     @Lazy
-    private com.thunder.matchenginex.util.CurrencyUtils currencyUtils;
+    private CurrencyUtils currencyUtils;
 
     public void placeOrder(Command command) {
         Order order = createOrderFromCommand(command);
@@ -383,19 +386,25 @@ public class MatchingEngine {
         long buyUserId = trade.getBuyUserId();
         long sellUserId = trade.getSellUserId();
 
-        // Transfer from buyer to seller: USDT (quote currency)
-        // Unfreeze from buyer and add to seller
-        accountService.unfreezeBalance(buyUserId, quoteCurrency, tradeAmount);
-        accountService.addBalance(sellUserId, quoteCurrency, tradeAmount);
+        // Transfer USDT from buyer's frozen balance to seller's available balance
+        boolean usdtTransferSuccess = accountService.transferFromFrozen(buyUserId, sellUserId, quoteCurrency, tradeAmount);
+        if (!usdtTransferSuccess) {
+            log.error("Failed to transfer {} {} from buy user {} to sell user {}",
+                    tradeAmount, quoteCurrency, buyUserId, sellUserId);
+        }
 
-        // Transfer from seller to buyer: BTC (base currency)
-        // Unfreeze from seller and add to buyer
-        accountService.unfreezeBalance(sellUserId, baseCurrency, tradeQuantity);
-        accountService.addBalance(buyUserId, baseCurrency, tradeQuantity);
+        // Transfer BTC from seller's frozen balance to buyer's available balance
+        boolean btcTransferSuccess = accountService.transferFromFrozen(sellUserId, buyUserId, baseCurrency, tradeQuantity);
+        if (!btcTransferSuccess) {
+            log.error("Failed to transfer {} {} from sell user {} to buy user {}",
+                    tradeQuantity, baseCurrency, sellUserId, buyUserId);
+        }
 
-        log.info("Fund transfer executed: Buy user {} received {} {}, Sell user {} received {} {}",
-                buyUserId, tradeQuantity, baseCurrency,
-                sellUserId, tradeAmount, quoteCurrency);
+        if (usdtTransferSuccess && btcTransferSuccess) {
+            log.info("Fund transfer executed successfully: Buy user {} received {} {}, Sell user {} received {} {}",
+                    buyUserId, tradeQuantity, baseCurrency,
+                    sellUserId, tradeAmount, quoteCurrency);
+        }
     }
 
     private void releaseFrozenFunds(String symbol, Order order) {

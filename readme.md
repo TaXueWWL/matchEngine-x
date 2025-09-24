@@ -416,6 +416,96 @@ klineChart.addCandlestickSeries is not a function 错误表明：
 
 现在自成交时资金总量保持不变，解决了之前资金"消失"的bug！
 
+## 已经修复了资金重复增加的bug！
+
+问题根源：
+之前的逻辑是 unfreezeBalance() + addBalance()，这导致了双重增加：
+1. unfreezeBalance() - 减少冻结金额，增加可用金额
+2. addBalance() - 再次增加可用金额
+
+修复方案：
+1. 新增 transferFromFrozen() 方法：
+   - 从付款方的冻结余额中直接扣除（不增加其可用余额）
+   - 将金额加到收款方的可用余额
+2. 正确的资金流转逻辑：
+   - 买方冻结的USDT → 直接转给卖方的可用USDT
+   - 卖方冻结的BTC → 直接转给买方的可用BTC
+
+自成交场景验证：
+- 初始状态：10 BTC + 10000 USDT（总额20000+）
+- 下买单：冻结1000 USDT → 可用：10 BTC + 9000 USDT，冻结：1000 USDT
+- 下卖单：冻结5 BTC → 可用：5 BTC + 9000 USDT，冻结：5 BTC + 1000 USDT
+- 成交后：
+    - 买方的1000 USDT冻结余额 → 卖方的1000 USDT可用余额（同一人）
+    - 卖方的5 BTC冻结余额 → 买方的5 BTC可用余额（同一人）
+    - 最终结果：10 BTC + 10000 USDT ✅
+
+现在自成交时总资金量完全不变，没有重复增加的问题！
+
+## 使用Agrona优化OrderBook集合性能计划                                                                                                                                         │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ 当前状态分析                                                                                                                                                                │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ - 项目已经使用Eclipse Collections的MutableLongObjectMap                                                                                                                     │ │
+    │ │ - OrderBook中仍有TreeMap、ConcurrentHashMap、LinkedList等JDK集合                                                                                                            │ │
+    │ │ - PriceLevel使用LinkedList<Order>存储订单队列                                                                                                                               │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ 优化计划                                                                                                                                                                    │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ 1. 添加Agrona依赖                                                                                                                                                           │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ 在pom.xml中添加Agrona依赖：                                                                                                                                                 │ │
+    │ │ <dependency>                                                                                                                                                                │ │
+    │ │     <groupId>org.agrona</groupId>                                                                                                                                           │ │
+    │ │     <artifactId>agrona</artifactId>                                                                                                                                         │ │
+    │ │     <version>1.21.1</version>                                                                                                                                               │ │
+    │ │ </dependency>                                                                                                                                                               │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ 2. OrderBook集合优化                                                                                                                                                        │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ 替换集合类型：                                                                                                                                                              │ │
+    │ │ - Map<Long, PriceLevel> orderToPriceLevelMap → Long2ObjectHashMap<PriceLevel>                                                                                               │ │
+    │ │ - 保持NavigableMap用于价格排序（性能关键）                                                                                                                                  │ │
+    │ │ - 添加对象池来复用Order和Trade对象                                                                                                                                          │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ 3. PriceLevel集合优化                                                                                                                                                       │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ 订单队列优化：                                                                                                                                                              │ │
+    │ │ - LinkedList<Order> → ArrayDeque<Order>（更好的缓存局部性）                                                                                                                 │ │
+    │ │ - 或使用Agrona的ManyToOneConcurrentArrayQueue（如果需要并发）                                                                                                               │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ 4. 内存优化策略                                                                                                                                                             │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ 对象池化：                                                                                                                                                                  │ │
+    │ │ - 创建OrderPool和TradePool来复用对象                                                                                                                                        │ │
+    │ │ - 使用Agrona的ObjectPool减少GC压力                                                                                                                                          │ │
+    │ │ - 预分配固定大小的对象数组                                                                                                                                                  │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ 5. 缓存优化                                                                                                                                                                 │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ CPU缓存友好的数据结构：                                                                                                                                                     │ │
+    │ │ - 使用紧凑的数组结构存储价格级别                                                                                                                                            │ │
+    │ │ - 减少对象间的指针跳转                                                                                                                                                      │ │
+    │ │ - 按访问模式优化内存布局                                                                                                                                                    │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ 预期收益                                                                                                                                                                    │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ 1. 减少GC压力 - 对象池化减少临时对象创建                                                                                                                                    │ │
+    │ │ 2. 提高缓存命中率 - 更紧凑的内存布局                                                                                                                                        │ │
+    │ │ 3. 降低延迟 - 避免LinkedList的指针遍历开销                                                                                                                                  │ │
+    │ │ 4. 提升吞吐量 - 更高效的集合操作                                                                                                                                            │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ 实施步骤                                                                                                                                                                    │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ 1. 添加Agrona依赖                                                                                                                                                           │ │
+    │ │ 2. 创建对象池工具类                                                                                                                                                         │ │
+    │ │ 3. 优化OrderBook中的集合                                                                                                                                                    │ │
+    │ │ 4. 优化PriceLevel中的队列                                                                                                                                                   │ │
+    │ │ 5. 添加性能基准测试                                                                                                                                                         │ │
+    │ │ 6. 逐步验证和调优                                                                                                                                                           │ │
+    │ │                                                                                                                                                                             │ │
+    │ │ 这个优化方案将显著提升高频交易场景下的性能。
+
 # todo
 - √ 修复bug，订单簿展示
 - √ symbol是一个对象，有quoteCoin和baseCoin两个属性，更换所有解析字符串的逻辑如extractBaseCurrency extractQuoteCurrency
