@@ -143,8 +143,9 @@ function subscribeToUpdates() {
         // Subscribe to order book updates
         console.log('Subscribing to order book updates for', currentSymbol);
         stompClient.subscribe('/topic/orderbook/' + currentSymbol, function(message) {
-            console.log('Received order book update');
+            console.log('Received order book update:', message);
             const orderBook = JSON.parse(message.body);
+            console.log('Parsed order book data:', orderBook);
             updateOrderBook(orderBook);
         });
 
@@ -190,6 +191,12 @@ function subscribeToUpdates() {
             });
 
         console.log('Successfully subscribed to all updates');
+
+        // Notify backend that we want to receive updates for this symbol
+        if (stompClient && (stompClient.connected || (stompClient.state && stompClient.state === 'CONNECTED'))) {
+            console.log('Sending subscription request to backend for', currentSymbol);
+            stompClient.send('/app/orderbook/subscribe', {}, currentSymbol);
+        }
     } catch (error) {
         console.error('Error subscribing to updates:', error);
     }
@@ -311,11 +318,11 @@ function initTradingPage() {
         console.error('Error loading current orders:', error);
     }
 
-    console.log('Initializing K-line chart...');
-    try {
-        initKLineChart();
-    } catch (error) {
-        console.error('Error initializing K-line chart:', error);
+    console.log('K-line chart disabled');
+    // Disable K-line chart to avoid blocking other functions
+    const chartContainer = document.getElementById('kline-chart');
+    if (chartContainer) {
+        chartContainer.innerHTML = '<div class="text-center text-muted p-4">K线图功能暂时禁用</div>';
     }
 
     // Set up form handlers (most important - should always work)
@@ -374,12 +381,21 @@ function loadOrderBook() {
 }
 
 function updateOrderBook(orderBook) {
+    console.log('Updating order book with data:', orderBook);
     const buyOrdersBody = document.getElementById('buy-orders-body');
     const sellOrdersBody = document.getElementById('sell-orders-body');
+
+    if (!buyOrdersBody || !sellOrdersBody) {
+        console.error('Order book containers not found');
+        return;
+    }
 
     // Handle both API response formats (buyLevels/sellLevels from REST API, bids/asks from WebSocket)
     const buyLevels = orderBook.buyLevels || orderBook.bids || [];
     const sellLevels = orderBook.sellLevels || orderBook.asks || [];
+
+    console.log('Buy levels:', buyLevels);
+    console.log('Sell levels:', sellLevels);
 
     // Update sell orders (asks) - lowest price first, displayed from bottom to top
     if (sellOrdersBody) {

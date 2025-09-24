@@ -378,3 +378,4 @@ klineChart.addCandlestickSeries is not a function 错误表明：
 - 启动从mysql or redis加载订单 ，余额
 - 操作的订单变化，资产变化都能写log到磁盘，不断更新
 - 启动加载订单簿
+- 定时打快照，快照完成的数据支持删除

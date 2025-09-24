@@ -379,4 +379,28 @@ public class TradingService {
                 userId, baseCurrency, quantity);
         }
     }
+
+    /**
+     * Get all active symbols that have order books
+     */
+    public java.util.Set<String> getAllActiveSymbols() {
+        java.util.Set<String> activeSymbols = new java.util.HashSet<>();
+
+        // Get symbols from trading pairs config
+        List<String> supportedSymbols = getSupportedSymbols();
+
+        for (String symbol : supportedSymbols) {
+            try {
+                OrderBook orderBook = orderBookManager.getOrderBook(symbol);
+                // Consider symbol active if it has an order book
+                if (orderBook != null) {
+                    activeSymbols.add(symbol);
+                }
+            } catch (Exception e) {
+                log.debug("Could not get order book for symbol {}: {}", symbol, e.getMessage());
+            }
+        }
+
+        return activeSymbols;
+    }
 }
