@@ -5,6 +5,7 @@ let stompClient = null;
 let currentUserId = 1;
 let currentSymbol = 'BTCUSDT';
 let priceChart = null;
+let klineChart = null;
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
@@ -93,6 +94,20 @@ function connectWebSocket() {
                 console.log('WebSocket connected:', frame);
                 updateConnectionStatus(true);
                 subscribeToUpdates();
+
+                // Initialize or enable K-line chart with WebSocket connection - 使用WebSocket连接初始化或启用K线图
+                if (window.location.pathname === '/trading') {
+                    setTimeout(() => {
+                        // Small delay to ensure WebSocket is fully established
+                        if (klineChart && typeof klineChart.enableRealtimeUpdates === 'function') {
+                            console.log('Enabling real-time updates for existing K-line chart');
+                            klineChart.enableRealtimeUpdates(stompClient);
+                        } else {
+                            console.log('Initializing K-line chart after WebSocket connection');
+                            initKLineChart();
+                        }
+                    }, 500);
+                }
             };
 
             stompClient.onDisconnect = function() {
@@ -327,11 +342,17 @@ function initTradingPage() {
         console.error('Error loading current orders:', error);
     }
 
-    console.log('K-line chart disabled');
-    // Disable K-line chart to avoid blocking other functions
-    const chartContainer = document.getElementById('kline-chart');
-    if (chartContainer) {
-        chartContainer.innerHTML = '<div class="text-center text-muted p-4">K线图功能暂时禁用</div>';
+    console.log('Initializing K-line chart (real-time updates will be enabled after WebSocket connection)...');
+    // Initialize K-line chart immediately to show historical data
+    // Real-time updates will be enabled when WebSocket connects
+    try {
+        initKLineChart();
+    } catch (error) {
+        console.error('Error initializing K-line chart:', error);
+        const chartContainer = document.getElementById('kline-chart');
+        if (chartContainer) {
+            chartContainer.innerHTML = '<div class="text-center text-muted p-4">K线图初始化失败</div>';
+        }
     }
 
     // Set up form handlers (most important - should always work)
@@ -581,93 +602,73 @@ function placeOrder(side) {
     });
 }
 
-let klineChart = null;
-let candlestickSeries = null;
-
 function initKLineChart() {
-    console.log('Initializing K-line chart...');
-    const chartContainer = document.getElementById('kline-chart');
-
-    if (!chartContainer) {
-        console.error('Chart container not found');
-        return;
-    }
-
-    // Check if LightweightCharts is available
-    if (typeof LightweightCharts === 'undefined') {
-        console.error('LightweightCharts library not loaded');
-        chartContainer.innerHTML = '<div class="text-center text-muted p-4">K线图库未加载</div>';
-        return;
-    }
+    console.log('Initializing K-line chart with real-time data...');
 
     try {
-        console.log('Creating chart with LightweightCharts...');
-        // Create the chart
-        klineChart = LightweightCharts.createChart(chartContainer, {
-            width: chartContainer.clientWidth,
-            height: chartContainer.clientHeight,
-            layout: {
-                background: { type: 'solid', color: 'white' },
-                textColor: 'black',
-            },
-            grid: {
-                vertLines: { color: '#f0f0f0' },
-                horzLines: { color: '#f0f0f0' },
-            },
-            crosshair: {
-                mode: LightweightCharts.CrosshairMode.Normal,
-            },
-            rightPriceScale: {
-                borderColor: '#cccccc',
-                scaleMargins: {
-                    top: 0.1,
-                    bottom: 0.1,
-                },
-            },
-            timeScale: {
-                borderColor: '#cccccc',
-                timeVisible: true,
-                secondsVisible: false,
-            },
-        });
+        // Try TradingView Lightweight Charts first
+        if (typeof KlineChart !== 'undefined') {
+            klineChart = new KlineChart('kline-chart', {
+                symbol: currentSymbol,
+                timeframe: '1m',
+                height: 400,
+                stompClient: stompClient
+            });
 
-        console.log('Chart created, adding candlestick series...');
-        // Create candlestick series
-        candlestickSeries = klineChart.addCandlestickSeries({
-            upColor: '#26a69a',
-            downColor: '#ef5350',
-            borderVisible: false,
-            wickUpColor: '#26a69a',
-            wickDownColor: '#ef5350',
-        });
-
-        console.log('K-line chart initialized successfully');
-
-        // Handle resize
-        const resizeObserver = new ResizeObserver(entries => {
-            if (entries.length === 0 || entries[0].target !== chartContainer) return;
-            const newRect = entries[0].contentRect;
-            if (klineChart) {
-                klineChart.applyOptions({ width: newRect.width, height: newRect.height });
-            }
-        });
-        resizeObserver.observe(chartContainer);
-
-        // Load initial K-line data
-        loadKLineData('1m');
-
-        // Set up timeframe buttons
-        setupTimeframeButtons();
-
-        // Hide loading indicator
-        const loadingElement = document.getElementById('kline-loading');
-        if (loadingElement) {
-            loadingElement.style.display = 'none';
+            console.log('TradingView K-line chart initialized successfully');
+        } else {
+            throw new Error('KlineChart class not loaded, trying fallback');
         }
+
     } catch (error) {
-        console.error('Error initializing K-line chart:', error);
-        chartContainer.innerHTML = '<div class="text-center text-muted p-4">K线图初始化失败</div>';
+        console.warn('TradingView chart failed, trying fallback:', error);
+
+        // Fallback to Chart.js implementation
+        try {
+            if (typeof FallbackKlineChart !== 'undefined') {
+                klineChart = new FallbackKlineChart('kline-chart', {
+                    symbol: currentSymbol,
+                    timeframe: '1m',
+                    stompClient: stompClient
+                });
+
+                console.log('Fallback K-line chart initialized successfully');
+            } else {
+                throw new Error('No chart implementation available');
+            }
+
+        } catch (fallbackError) {
+            console.error('Both chart implementations failed:', fallbackError);
+            const chartContainer = document.getElementById('kline-chart');
+            if (chartContainer) {
+                chartContainer.innerHTML = `
+                    <div class="text-center text-muted p-4">
+                        <i class="fas fa-chart-line fa-2x mb-2"></i>
+                        <p>K线图暂时不可用</p>
+                        <small>请刷新页面重试</small>
+                    </div>
+                `;
+            }
+            return;
+        }
     }
+
+    // Set up timeframe buttons
+    setupTimeframeButtons();
+
+    // Hide loading indicator
+    const loadingElement = document.getElementById('kline-loading');
+    if (loadingElement) {
+        loadingElement.style.display = 'none';
+    }
+}
+
+// Function to reinitialize K-line chart after WebSocket connection
+function reinitializeKlineChart() {
+    if (klineChart && typeof klineChart.destroy === 'function') {
+        klineChart.destroy();
+    }
+    initKLineChart();
 }
 
 function setupTimeframeButtons() {
@@ -678,9 +679,11 @@ function setupTimeframeButtons() {
             buttons.forEach(b => b.classList.remove('active'));
             this.classList.add('active');
 
-            // Load new data for selected timeframe
+            // Change timeframe in K-line chart
             const timeframe = this.dataset.timeframe;
-            loadKLineData(timeframe);
+            if (klineChart && typeof klineChart.changeTimeframe === 'function') {
+                klineChart.changeTimeframe(timeframe);
+            }
         });
     });
 }

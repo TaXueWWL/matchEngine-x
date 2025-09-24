@@ -534,6 +534,71 @@ klineChart.addCandlestickSeries is not a function 错误表明：
 
 这些优化特别适合高频交易场景，能显著提升订单匹配引擎的性能！
 
+## ✅ 修复的K线图错误总结
+
+🐛 原始错误
+
+Uncaught TypeError: Cannot read properties of null (reading 'setData')
+at KlineChart.changeTimeframe (kline-chart.js:201:32)
+
+🔧 修复内容
+
+1. changeTimeframe方法安全检查
+   // 修复前
+   this.candlestickSeries.setData([]);
+
+// 修复后
+if (this.candlestickSeries) {
+this.candlestickSeries.setData([]);
+}
+2. changeSymbol方法安全检查
+   if (this.candlestickSeries) {
+   this.candlestickSeries.setData([]);
+   }
+3. updateChart方法安全检查
+   if (candleData && this.candlestickSeries) {
+   this.candlestickSeries.update(candleData);
+   }
+4. loadInitialData方法安全检查
+   if (klines && klines.length > 0 && this.candlestickSeries) {
+   // 处理数据
+   if (this.chart) {
+   this.chart.timeScale().fitContent();
+   }
+   }
+5. WebSocket订阅数据安全检查
+   if (klines && klines.length > 0 && this.candlestickSeries) {
+   const candleData = this.transformKlineData(klines);
+   this.candlestickSeries.setData(candleData);
+   if (this.chart) {
+   this.chart.timeScale().fitContent();
+   }
+   }
+6. WebSocket连接后重新初始化K线图
+   stompClient.onConnect = function(frame) {
+   // ... 其他代码
+
+   // 在交易页面重新初始化K线图
+   if (window.location.pathname === '/trading') {
+   reinitializeKlineChart();
+   }
+   };
+
+🎯 修复原因
+
+问题根源：K线图在WebSocket未连接时就被初始化，导致某些情况下candlestickSeries可能为null。
+
+解决方案：
+- ✅ 添加空指针检查，防止运行时错误
+- ✅ WebSocket连接成功后重新初始化K线图
+- ✅ 确保所有图表操作都有安全检查
+
+现在K线功能应该能正常工作了！用户可以：
+- 🕐 切换时间框架（1秒到1小时）
+- 📊 查看实时蜡烛图
+- 🔄 通过WebSocket接收实时数据更新
+- 📈 基于真实交易数据生成K线
+
 # todo
 - √ 修复bug，订单簿展示
 - √ symbol是一个对象，有quoteCoin和baseCoin两个属性，更换所有解析字符串的逻辑如extractBaseCurrency extractQuoteCurrency
@@ -541,13 +606,14 @@ klineChart.addCandlestickSeries is not a function 错误表明：
 - √ 自成交计算bug
 - 市价单逻辑，页面支持各种订单类型
 - k线展示
-- 数据结构优化 agrona
+- √ 数据结构优化 agrona
 - 订单的状态数量异步写入mysql or redis
 - 启动从mysql or redis加载订单 ，余额
 - 操作的订单变化，资产变化都能写log到磁盘，不断更新
 - 启动加载订单簿
 - 定时打快照，快照完成的数据支持删除  用protobuf序列化打快照，恢复快照
 - 改单功能不好使，模态框不展示
+- 推送使用ringbuffer而不是直接线程就推出来
 
 页面展示的账户余额应该是可用余额
 最新成交价是成交发生时候的价格，规则：

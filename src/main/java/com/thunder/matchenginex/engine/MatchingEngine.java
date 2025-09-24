@@ -12,6 +12,7 @@ import com.thunder.matchenginex.orderbook.PriceLevel;
 import com.thunder.matchenginex.service.AccountService;
 import com.thunder.matchenginex.util.CurrencyUtils;
 import com.thunder.matchenginex.websocket.OrderBookWebSocketController;
+import com.thunder.matchenginex.service.KlineService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -44,6 +45,10 @@ public class MatchingEngine {
     @Autowired
     @Lazy
     private CurrencyUtils currencyUtils;
+
+    @Autowired
+    @Lazy
+    private KlineService klineService;
 
     public void placeOrder(Command command) {
         Order order = createOrderFromCommand(command);
@@ -373,6 +378,9 @@ public class MatchingEngine {
 
             // Execute the actual fund transfer - 执行实际的资金转移
             executeFundTransfer(trade);
+
+            // Update K-line data - 更新K线数据
+            klineService.processTrade(trade);
         }
     }
 
