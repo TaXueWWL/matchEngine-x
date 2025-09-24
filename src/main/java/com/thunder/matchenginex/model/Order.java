@@ -3,6 +3,7 @@ package com.thunder.matchenginex.model;
 import com.thunder.matchenginex.enums.OrderSide;
 import com.thunder.matchenginex.enums.OrderStatus;
 import com.thunder.matchenginex.enums.OrderType;
+import com.thunder.matchenginex.util.ObjectPool;
 import lombok.Data;
 import lombok.Builder;
 import lombok.AllArgsConstructor;
@@ -15,7 +16,7 @@ import java.time.Instant;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class Order {
+public class Order implements ObjectPool.Resetable {
     private long orderId;
     private String symbol;
     private long userId;
@@ -72,5 +73,21 @@ public class Order {
         } else {
             return this.price.compareTo(other.price) <= 0;
         }
+    }
+
+    @Override
+    public void reset() {
+        this.orderId = 0;
+        this.symbol = null;
+        this.userId = 0;
+        this.side = null;
+        this.type = null;
+        this.price = null;
+        this.quantity = null;
+        this.filledQuantity = BigDecimal.ZERO;
+        this.remainingQuantity = null;
+        this.status = OrderStatus.NEW;
+        this.timestamp = 0;
+        this.sequence = 0;
     }
 }

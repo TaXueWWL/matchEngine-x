@@ -131,25 +131,8 @@ public class OrderBookWebSocketController {
      * to determine the likely trade price
      */
     private BigDecimal getLatestTradePrice(String symbol, OrderBook orderBook) {
-        BigDecimal bestBid = orderBook.getBestBuyPrice();
-        BigDecimal bestAsk = orderBook.getBestSellPrice();
-
         // If we have a stored last trade price, use it as priority
-        BigDecimal storedLastPrice = lastTradePrice.get(symbol);
-        if (storedLastPrice != null) {
-            return storedLastPrice;
-        }
-
-        if (bestBid != null) {
-            // Only bid exists - likely price for sell takers
-            return bestBid;
-        }
-        if (bestAsk != null) {
-            // Only ask exists - likely price for buy takers
-            return bestAsk;
-        }
-
-        return null;
+        return lastTradePrice.get(symbol);
     }
 
     /**

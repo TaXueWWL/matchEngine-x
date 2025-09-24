@@ -67,6 +67,13 @@
             <version>11.1.0</version>
         </dependency>
 
+        <!-- Agrona for high-performance data structures -->
+        <dependency>
+            <groupId>org.agrona</groupId>
+            <artifactId>agrona</artifactId>
+            <version>1.21.1</version>
+        </dependency>
+
         <!-- Logging -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

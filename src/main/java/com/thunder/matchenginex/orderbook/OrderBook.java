@@ -4,6 +4,7 @@ import com.thunder.matchenginex.enums.OrderSide;
 import com.thunder.matchenginex.model.Order;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.agrona.collections.Long2ObjectHashMap;
 import org.eclipse.collections.api.map.primitive.MutableLongObjectMap;
 import org.eclipse.collections.impl.map.mutable.primitive.LongObjectHashMap;
 
@@ -25,8 +26,8 @@ public class OrderBook {
     // Fast order lookup
     private final MutableLongObjectMap<Order> orderMap = new LongObjectHashMap<>();
 
-    // Track price level for each order for fast removal
-    private final Map<Long, PriceLevel> orderToPriceLevelMap = new ConcurrentHashMap<>();
+    // Track price level for each order for fast removal - using Agrona for better performance
+    private final Long2ObjectHashMap<PriceLevel> orderToPriceLevelMap = new Long2ObjectHashMap<>();
 
     // Historical orders (completed orders: FILLED, CANCELLED, REJECTED)
     private final MutableLongObjectMap<Order> historicalOrders = new LongObjectHashMap<>();

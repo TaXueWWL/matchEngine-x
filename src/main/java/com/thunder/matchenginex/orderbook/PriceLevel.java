@@ -4,7 +4,7 @@ import com.thunder.matchenginex.model.Order;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.util.LinkedList;
+import java.util.ArrayDeque;
 import java.util.Queue;
 
 @Data
@@ -16,7 +16,8 @@ public class PriceLevel {
     public PriceLevel(BigDecimal price) {
         this.price = price;
         this.totalQuantity = BigDecimal.ZERO;
-        this.orders = new LinkedList<>();
+        // ArrayDeque provides better cache locality and performance than LinkedList
+        this.orders = new ArrayDeque<>();
     }
 
     public void addOrder(Order order) {
