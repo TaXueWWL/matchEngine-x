@@ -60,24 +60,24 @@ public class AccountService {
     }
 
     /**
-     * Transfer funds from frozen balance of fromUser to available balance of toUser
-     * Used for trade settlement
+     * Transfer funds from frozen balance of fromUser to available balance of toUser - 从发送用户的冻结余额转移资金到接收用户的可用余额
+     * Used for trade settlement - 用于交易结算
      */
     public boolean transferFromFrozen(Long fromUserId, Long toUserId, String currency, BigDecimal amount) {
         Account fromAccount = getAccount(fromUserId);
         Account toAccount = getAccount(toUserId);
 
-        // Check if fromUser has enough frozen balance
+        // Check if fromUser has enough frozen balance - 检查从用户是否有足够的冻结余额
         if (fromAccount.getFrozenAmount(currency).compareTo(amount) < 0) {
             log.error("Insufficient frozen balance for transfer: userId={}, currency={}, required={}, frozen={}",
                     fromUserId, currency, amount, fromAccount.getFrozenAmount(currency));
             return false;
         }
 
-        // Remove from sender's frozen balance (don't add to available)
+        // Remove from sender's frozen balance (don't add to available) - 从发送者的冻结余额中移除 (不添加到可用余额)
         fromAccount.getFrozen().merge(currency, amount.negate(), BigDecimal::add);
 
-        // Add to receiver's available balance
+        // Add to receiver's available balance - 添加到接收者的可用余额
         toAccount.addBalance(currency, amount);
 
         log.info("Transferred from frozen: from userId={} to userId={}, currency={}, amount={}",

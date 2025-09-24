@@ -17,19 +17,19 @@ import java.util.concurrent.ConcurrentHashMap;
 public class OrderBook {
     private final String symbol;
 
-    // Buy orders (highest price first)
+    // Buy orders (highest price first) - Buy Order (最高价优先)
     private final NavigableMap<BigDecimal, PriceLevel> buyLevels = new TreeMap<>(Collections.reverseOrder());
 
-    // Sell orders (lowest price first)
+    // Sell orders (lowest price first) - Sell Order (最低价优先)
     private final NavigableMap<BigDecimal, PriceLevel> sellLevels = new TreeMap<>();
 
-    // Fast order lookup
+    // Fast order lookup - 快速Order查找
     private final MutableLongObjectMap<Order> orderMap = new LongObjectHashMap<>();
 
-    // Track price level for each order for fast removal - using Agrona for better performance
+    // Track price level for each order for fast removal - using Agrona for better performance - 跟踪每个Order的价格层级以实现快速移除 - 使用Agrona获得更好的性能
     private final Long2ObjectHashMap<PriceLevel> orderToPriceLevelMap = new Long2ObjectHashMap<>();
 
-    // Historical orders (completed orders: FILLED, CANCELLED, REJECTED)
+    // Historical orders (completed orders: FILLED, CANCELLED, REJECTED) - 历史Order (已完成的Order：FILLED, CANCELLED, REJECTED)
     private final MutableLongObjectMap<Order> historicalOrders = new LongObjectHashMap<>();
 
     public OrderBook(String symbol) {
@@ -59,7 +59,7 @@ public class OrderBook {
         if (priceLevel != null) {
             priceLevel.removeOrder(order);
 
-            // Remove empty price level
+            // Remove empty price level - 移除空的价格层级
             if (priceLevel.isEmpty()) {
                 NavigableMap<BigDecimal, PriceLevel> levels =
                     order.getSide() == OrderSide.BUY ? buyLevels : sellLevels;
@@ -153,21 +153,21 @@ public class OrderBook {
     public List<Order> getUserOrders(long userId) {
         List<Order> userOrders = new ArrayList<>();
 
-        // Get active orders
+        // Get active orders - 获取活跃Order
         for (Order order : orderMap.values()) {
             if (order.getUserId() == userId) {
                 userOrders.add(order);
             }
         }
 
-        // Get historical orders
+        // Get historical orders - 获取历史Order
         for (Order order : historicalOrders.values()) {
             if (order.getUserId() == userId) {
                 userOrders.add(order);
             }
         }
 
-        // Sort by timestamp (newest first)
+        // Sort by timestamp (newest first) - 按时间戳排序 (最新的优先)
         userOrders.sort((o1, o2) -> Long.compare(o2.getTimestamp(), o1.getTimestamp()));
 
         return userOrders;
@@ -182,7 +182,7 @@ public class OrderBook {
             }
         }
 
-        // Sort by timestamp (newest first)
+        // Sort by timestamp (newest first) - 按时间戳排序 (最新的优先)
         userOrders.sort((o1, o2) -> Long.compare(o2.getTimestamp(), o1.getTimestamp()));
 
         return userOrders;

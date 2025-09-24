@@ -39,7 +39,7 @@ public class TradingService {
                           BigDecimal price, BigDecimal quantity) {
         long orderId = orderIdGenerator.getAndIncrement();
 
-        // Immediately freeze the required funds to prevent overselling
+        // Immediately freeze the required funds to prevent overselling - 立即冻结所需资金以防止过度销售
         freezeOrderFunds(symbol, userId, side, orderType, price, quantity);
 
         Command command = Command.placeOrder(orderId, symbol, userId, side, orderType, price, quantity);
@@ -82,7 +82,7 @@ public class TradingService {
                                BigDecimal price, BigDecimal quantity) {
         long orderId = orderIdGenerator.getAndIncrement();
 
-        // Try to freeze funds first
+        // Try to freeze funds first - 先尝试冻结资金
         try {
             freezeOrderFunds(symbol, userId, side, orderType, price, quantity);
         } catch (Exception e) {
@@ -97,7 +97,7 @@ public class TradingService {
             log.info("Successfully submitted place order: {} {} {} @ {} qty: {}",
                     orderId, symbol, side, price, quantity);
         } else {
-            // If command publishing fails, unfreeze the funds
+            // If command publishing fails, unfreeze the funds - 如果命令发布失败，解冻资金
             unfreezeOrderFunds(symbol, userId, side, orderType, price, quantity);
             log.warn("Failed to submit place order - ring buffer full, funds unfrozen");
         }
@@ -111,7 +111,7 @@ public class TradingService {
             throw new IllegalArgumentException("Symbol cannot be null or empty");
         }
 
-        // Validate symbol is supported
+        // Validate symbol is supported - 验证支持的交易对
         if (!tradingPairsConfig.isValidSymbol(symbol)) {
             throw new IllegalArgumentException("Unsupported trading pair: " + symbol);
         }
@@ -128,20 +128,20 @@ public class TradingService {
             throw new IllegalArgumentException("Quantity must be positive");
         }
 
-        // Price validation for non-market orders
+        // Price validation for non-market orders - 非 Market Order 的价格验证
         if (orderType != OrderType.MARKET) {
             if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new IllegalArgumentException("Price must be positive for non-market orders");
             }
         }
 
-        // Validate against trading pair constraints
+        // Validate against trading pair constraints - 根据交易对约束验证
         TradingPair tradingPair = tradingPairsConfig.getTradingPair(symbol);
         if (tradingPair != null) {
             validateTradingPairConstraints(tradingPair, price, quantity, orderType);
         }
 
-        // Validate user balance
+        // Validate user balance - 验证用户余额
         validateUserBalance(symbol, userId, side, orderType, price, quantity);
 
         log.debug("Order validation passed for symbol: {}, side: {}, type: {}, price: {}, quantity: {}",
@@ -218,7 +218,7 @@ public class TradingService {
 
     private void validateTradingPairConstraints(TradingPair tradingPair,
                                               BigDecimal price, BigDecimal quantity, OrderType orderType) {
-        // Price constraints
+        // Price constraints - 价格约束
         if (orderType != OrderType.MARKET && price != null) {
             if (price.compareTo(tradingPair.getMinPrice()) < 0) {
                 throw new IllegalArgumentException(
@@ -232,7 +232,7 @@ public class TradingService {
             }
         }
 
-        // Quantity constraints
+        // Quantity constraints - 数量约束
         if (quantity.compareTo(tradingPair.getMinQuantity()) < 0) {
             throw new IllegalArgumentException(
                     String.format("Quantity %s is below minimum %s for %s",
@@ -247,18 +247,18 @@ public class TradingService {
 
     private void validateUserBalance(String symbol, long userId, OrderSide side, OrderType orderType,
                                    BigDecimal price, BigDecimal quantity) {
-        // For buy orders, check if user has enough quote currency (e.g., USDT for BTCUSDT)
+        // For buy orders, check if user has enough quote currency (e.g., USDT for BTCUSDT) - 对于Buy Order，检查用户是否有足够的计价货币 (例如，BTCUSDT中的USDT)
         if (side == OrderSide.BUY) {
             String quoteCurrency = currencyUtils.extractQuoteCurrency(symbol);
             BigDecimal requiredAmount;
 
             if (orderType == OrderType.MARKET) {
-                // For market orders, we need to estimate the cost
-                // For simplicity, we'll use a high estimate
+                // For market orders, we need to estimate the cost - 对于Market Order，需要估算成本
+                // For simplicity, we'll use a high estimate - 为简化，使用高估算
                 OrderBook orderBook = orderBookManager.getOrderBook(symbol);
                 BigDecimal estimatedPrice = orderBook.getBestSellPrice();
                 if (estimatedPrice == null) {
-                    estimatedPrice = price != null ? price : BigDecimal.valueOf(50000); // fallback
+                    estimatedPrice = price != null ? price : BigDecimal.valueOf(50000); // fallback - 退补值
                 }
                 requiredAmount = estimatedPrice.multiply(quantity);
             } else {
@@ -272,7 +272,7 @@ public class TradingService {
                         accountService.getAvailableBalance(userId, quoteCurrency), quoteCurrency));
             }
         }
-        // For sell orders, check if user has enough base currency (e.g., BTC for BTCUSDT)
+        // For sell orders, check if user has enough base currency (e.g., BTC for BTCUSDT) - 对于Sell Order，检查用户是否有足够的基础货币 (例如，BTCUSDT中的BTC)
         else if (side == OrderSide.SELL) {
             String baseCurrency = currencyUtils.extractBaseCurrency(symbol);
 
@@ -297,7 +297,7 @@ public class TradingService {
                 OrderBook orderBook = orderBookManager.getOrderBook(symbol);
                 BigDecimal estimatedPrice = orderBook.getBestSellPrice();
                 if (estimatedPrice == null) {
-                    estimatedPrice = price != null ? price : BigDecimal.valueOf(50000); // fallback
+                    estimatedPrice = price != null ? price : BigDecimal.valueOf(50000); // fallback - 退补值
                 }
                 requiredAmount = estimatedPrice.multiply(quantity);
             } else {
@@ -340,7 +340,7 @@ public class TradingService {
                 OrderBook orderBook = orderBookManager.getOrderBook(symbol);
                 BigDecimal estimatedPrice = orderBook.getBestSellPrice();
                 if (estimatedPrice == null) {
-                    estimatedPrice = price != null ? price : BigDecimal.valueOf(50000); // fallback
+                    estimatedPrice = price != null ? price : BigDecimal.valueOf(50000); // fallback - 退补值
                 }
                 requiredAmount = estimatedPrice.multiply(quantity);
             } else {
@@ -361,18 +361,18 @@ public class TradingService {
     }
 
     /**
-     * Get all active symbols that have order books
+     * Get all active symbols that have order books - 获取所有有OrderBook的活跃交易对
      */
     public java.util.Set<String> getAllActiveSymbols() {
         java.util.Set<String> activeSymbols = new java.util.HashSet<>();
 
-        // Get symbols from trading pairs config
+        // Get symbols from trading pairs config - 从交易对配置中获取交易对
         List<String> supportedSymbols = getSupportedSymbols();
 
         for (String symbol : supportedSymbols) {
             try {
                 OrderBook orderBook = orderBookManager.getOrderBook(symbol);
-                // Consider symbol active if it has an order book
+                // Consider symbol active if it has an order book - 如果有OrderBook则认为交易对活跃
                 if (orderBook != null) {
                     activeSymbols.add(symbol);
                 }
