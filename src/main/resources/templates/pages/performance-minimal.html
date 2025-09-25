@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<!-- Minimal Performance Monitoring Content Fragment -->
+<div th:fragment="content">
+    <!-- 页面标题 -->
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h2><i class="fas fa-tachometer-alt"></i> 性能监控</h2>
+                <p class="text-muted">实时监控WebSocket推送和Disruptor性能指标</p>
+                <button class="btn btn-primary mb-4" onclick="refreshData()">
+                    <i class="fas fa-sync-alt"></i> 刷新数据
+                </button>
+            </div>
+        </div>
+
+        <!-- 系统健康状态 -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>系统状态</h5>
+                    </div>
+                    <div class="card-body">
+                        <h3 id="overall-status" class="text-primary">加载中...</h3>
+                        <small class="text-muted">整体健康状态</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Disruptor</h5>
+                    </div>
+                    <div class="card-body">
+                        <h3 id="disruptor-status" class="text-info">加载中...</h3>
+                        <small class="text-muted">消息队列状态</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>撮合引擎</h5>
+                    </div>
+                    <div class="card-body">
+                        <h3 id="matching-engine-status" class="text-warning">加载中...</h3>
+                        <small class="text-muted">引擎运行状态</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 性能指标 -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Disruptor 指标</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-6">
+                                <h4 id="cursor-position" class="text-success">-</h4>
+                                <small>当前游标</small>
+                            </div>
+                            <div class="col-6">
+                                <h4 id="remaining-capacity" class="text-warning">-</h4>
+                                <small>剩余容量</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>线程池状态</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-6">
+                                <h4 id="active-threads" class="text-danger">-</h4>
+                                <small>活跃线程</small>
+                            </div>
+                            <div class="col-6">
+                                <h4 id="queue-size" class="text-info">-</h4>
+                                <small>队列大小</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 状态信息 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>运行状态</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>最后更新: <span id="last-update" class="badge bg-secondary">-</span></p>
+                        <p>API状态: <span id="api-status" class="badge bg-success">正常</span></p>
+                        <div id="detailed-info">
+                            <p class="text-muted">等待数据加载...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Minimal scripts fragment -->
+<div th:fragment="scripts">
+    <script>
+        console.log('🚀 Minimal performance monitoring loaded');
+
+        // 页面加载后自动刷新
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('✅ DOM loaded, starting data refresh...');
+            refreshData();
+
+            // 设置自动刷新 (每5秒)
+            setInterval(refreshData, 5000);
+        });
+
+        // 主要的数据刷新函数
+        function refreshData() {
+            console.log('🔄 Refreshing data...');
+
+            // 更新时间戳
+            const now = new Date().toLocaleTimeString();
+            document.getElementById('last-update').textContent = now;
+
+            // 并行加载所有数据
+            Promise.all([
+                loadHealthData(),
+                loadDisruptorData(),
+                loadWebSocketData()
+            ]).then(function() {
+                console.log('✅ All data loaded');
+                document.getElementById('api-status').textContent = '正常';
+                document.getElementById('api-status').className = 'badge bg-success';
+            }).catch(function(error) {
+                console.error('❌ Data loading failed:', error);
+                document.getElementById('api-status').textContent = '错误';
+                document.getElementById('api-status').className = 'badge bg-danger';
+            });
+        }
+
+        // 加载健康数据
+        function loadHealthData() {
+            return fetch('/api/performance/health')
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    console.log('Health data:', data);
+
+                    document.getElementById('overall-status').textContent = getStatusText(data.status);
+                    document.getElementById('disruptor-status').textContent = getStatusText(data.disruptor);
+                    document.getElementById('matching-engine-status').textContent = getStatusText(data.matchingEngine);
+                })
+                .catch(function(error) {
+                    console.error('Health API error:', error);
+                    document.getElementById('overall-status').textContent = '错误';
+                    document.getElementById('disruptor-status').textContent = '错误';
+                    document.getElementById('matching-engine-status').textContent = '错误';
+                });
+        }
+
+        // 加载Disruptor数据
+        function loadDisruptorData() {
+            return fetch('/api/performance/disruptor')
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    console.log('Disruptor data:', data);
+
+                    if (data.disruptorStats) {
+                        const stats = parseDisruptorStats(data.disruptorStats);
+                        document.getElementById('cursor-position').textContent = stats.cursor || '-';
+                        document.getElementById('remaining-capacity').textContent = stats.capacity || '-';
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Disruptor API error:', error);
+                    document.getElementById('cursor-position').textContent = '错误';
+                    document.getElementById('remaining-capacity').textContent = '错误';
+                });
+        }
+
+        // 加载WebSocket数据
+        function loadWebSocketData() {
+            return fetch('/api/performance/websocket-push')
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    console.log('WebSocket data:', data);
+
+                    if (data.overall) {
+                        const stats = parseThreadPoolStats(data.overall);
+                        document.getElementById('active-threads').textContent = stats.active || '-';
+                        document.getElementById('queue-size').textContent = stats.queue || '-';
+                    }
+
+                    // 更新详细信息
+                    let html = '<div class="row">';
+                    html += '<div class="col-12"><strong>详细统计:</strong></div>';
+                    html += '<div class="col-12"><small><code>' + (data.overall || 'N/A') + '</code></small></div>';
+                    html += '</div>';
+
+                    document.getElementById('detailed-info').innerHTML = html;
+                })
+                .catch(function(error) {
+                    console.error('WebSocket API error:', error);
+                    document.getElementById('active-threads').textContent = '错误';
+                    document.getElementById('queue-size').textContent = '错误';
+                    document.getElementById('detailed-info').innerHTML = '<p class="text-danger">加载失败: ' + error.message + '</p>';
+                });
+        }
+
+        // 解析Disruptor统计信息
+        function parseDisruptorStats(statsString) {
+            const stats = {};
+            if (typeof statsString === 'string') {
+                const cursorMatch = statsString.match(/Cursor: (\d+)/);
+                const capacityMatch = statsString.match(/Remaining Capacity: (\d+)/);
+                stats.cursor = cursorMatch ? cursorMatch[1] : null;
+                stats.capacity = capacityMatch ? capacityMatch[1] : null;
+            }
+            return stats;
+        }
+
+        // 解析线程池统计信息
+        function parseThreadPoolStats(statsString) {
+            const stats = {};
+            if (typeof statsString === 'string') {
+                const activeMatch = statsString.match(/Active: (\d+)/);
+                const queueMatch = statsString.match(/Queue: (\d+)/);
+                stats.active = activeMatch ? activeMatch[1] : null;
+                stats.queue = queueMatch ? queueMatch[1] : null;
+            }
+            return stats;
+        }
+
+        // 获取状态文本
+        function getStatusText(status) {
+            const statusMap = {
+                'healthy': '健康',
+                'running': '运行中',
+                'degraded': '降级',
+                'error': '错误',
+                'unhealthy': '不健康'
+            };
+            return statusMap[status] || status || '未知';
+        }
+    </script>
+</div>
+
+</html>

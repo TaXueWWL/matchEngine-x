@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<!-- Performance Monitoring Content Fragment -->
+<div th:fragment="content" id="performance-content">
+    <style>
+        /* 性能监控页面专用样式 - 支持主题切换 */
+        .performance-card {
+            border-left: 4px solid #007bff !important;
+            transition: all 0.3s ease;
+            background-color: var(--bs-card-bg, #ffffff) !important;
+            color: var(--bs-body-color, #212529) !important;
+        }
+
+        .performance-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #007bff !important;
+        }
+
+        .metric-label {
+            color: var(--bs-secondary, #6c757d) !important;
+            font-size: 0.9rem;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .status-healthy { background-color: #28a745 !important; }
+        .status-warning { background-color: #ffc107 !important; }
+        .status-error { background-color: #dc3545 !important; }
+        .status-unknown { background-color: #6c757d !important; }
+
+        .performance-chart {
+            height: 200px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            border-radius: 8px;
+            color: white !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .refresh-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2) !important;
+            border: none !important;
+            color: white !important;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            color: white !important;
+        }
+
+        .loading-spinner {
+            display: none;
+        }
+
+        .table-performance {
+            font-family: 'Courier New', monospace;
+            background-color: var(--bs-table-bg, transparent) !important;
+            color: var(--bs-body-color, #212529) !important;
+        }
+
+        /* 确保在黑色主题下也能正常显示 */
+        body.dark-theme .performance-card {
+            background-color: #181A20 !important;
+            color: #EAECEF !important;
+            border-color: #2B2F36 !important;
+        }
+
+        body.dark-theme .performance-card .card-header {
+            background-color: #1E2026 !important;
+            color: #EAECEF !important;
+            border-bottom-color: #2B2F36 !important;
+        }
+
+        body.dark-theme .performance-card .card-body {
+            background-color: #181A20 !important;
+            color: #EAECEF !important;
+        }
+
+        body.dark-theme .metric-label {
+            color: #9CA3AF !important;
+        }
+
+        body.dark-theme .table-performance {
+            background-color: transparent !important;
+            color: #EAECEF !important;
+        }
+
+        body.dark-theme .table-performance th {
+            background-color: #2B2F36 !important;
+            color: #EAECEF !important;
+            border-color: #2B2F36 !important;
+        }
+
+        body.dark-theme .table-performance td {
+            background-color: #181A20 !important;
+            color: #EAECEF !important;
+            border-color: #2B2F36 !important;
+        }
+    </style>
+
+    <!-- 页面标题和刷新按钮 -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2><i class="fas fa-tachometer-alt text-primary"></i> 性能监控</h2>
+            <p class="text-muted">实时监控WebSocket推送和Disruptor性能指标</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <button class="btn btn-primary refresh-btn" onclick="refreshAllData()">
+                <i class="fas fa-sync-alt"></i> 刷新数据
+            </button>
+            <div class="loading-spinner text-primary mt-2">
+                <i class="fas fa-spinner fa-spin"></i> 加载中...
+            </div>
+        </div>
+    </div>
+
+    <!-- 系统健康状态 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card performance-card">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0"><i class="fas fa-heartbeat text-success"></i> 系统健康状态</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row" id="health-status">
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-center">
+                                <span class="status-indicator status-unknown"></span>
+                                <span>整体状态: <strong id="overall-status">检查中...</strong></span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-center">
+                                <span class="status-indicator status-unknown"></span>
+                                <span>Disruptor: <strong id="disruptor-status">检查中...</strong></span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-center">
+                                <span class="status-indicator status-unknown"></span>
+                                <span>撮合引擎: <strong id="matching-engine-status">检查中...</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Disruptor 性能指标 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card performance-card">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0"><i class="fas fa-rocket text-info"></i> Disruptor 性能</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="text-center">
+                                <div class="metric-value" id="ring-buffer-cursor">-</div>
+                                <div class="metric-label">当前游标位置</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-center">
+                                <div class="metric-value" id="ring-buffer-capacity">-</div>
+                                <div class="metric-label">剩余容量</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            <strong>配置信息:</strong><br>
+                            环形缓冲区大小: <span class="badge bg-primary">8192</span>
+                            等待策略: <span class="badge bg-info">BlockingWaitStrategy</span>
+                            生产者模式: <span class="badge bg-success">MULTI</span>
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card performance-card">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0"><i class="fas fa-chart-line text-success"></i> 线程池状态</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="text-center">
+                                <div class="metric-value" id="thread-pool-active">-</div>
+                                <div class="metric-label">活跃线程</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-center">
+                                <div class="metric-value" id="thread-pool-queue">-</div>
+                                <div class="metric-label">队列大小</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            线程池大小: <span id="thread-pool-size" class="badge bg-primary">-</span>
+                            已完成任务: <span id="thread-pool-completed" class="badge bg-success">-</span>
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WebSocket推送统计 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card performance-card">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0"><i class="fas fa-broadcast-tower text-warning"></i> WebSocket 推送统计</h5>
+                </div>
+                <div class="card-body">
+                    <div class="performance-chart" id="websocket-chart">
+                        <div class="text-center">
+                            <i class="fas fa-chart-area fa-3x mb-3"></i>
+                            <h4>实时推送监控</h4>
+                            <p>Disruptor + WebSocket 超低延迟推送</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 详细统计信息 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card performance-card">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0"><i class="fas fa-list-alt text-secondary"></i> 详细统计信息</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-performance">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>指标</th>
+                                    <th>当前值</th>
+                                    <th>描述</th>
+                                    <th>状态</th>
+                                </tr>
+                            </thead>
+                            <tbody id="performance-details">
+                                <tr>
+                                    <td>系统运行时间</td>
+                                    <td id="system-uptime">计算中...</td>
+                                    <td>服务启动到现在的时间</td>
+                                    <td><span class="badge bg-success">正常</span></td>
+                                </tr>
+                                <tr>
+                                    <td>Disruptor 状态</td>
+                                    <td id="disruptor-detailed-status">检查中...</td>
+                                    <td>环形缓冲区运行状态</td>
+                                    <td><span class="badge bg-primary">监控中</span></td>
+                                </tr>
+                                <tr>
+                                    <td>WebSocket 连接</td>
+                                    <td id="websocket-connections">获取中...</td>
+                                    <td>当前活跃的WebSocket连接数</td>
+                                    <td><span class="badge bg-info">活跃</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近更新时间 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="text-center text-muted">
+                <small>
+                    <i class="fas fa-clock"></i>
+                    最后更新: <span id="last-update-time">-</span>
+                    | 自动刷新: <span id="auto-refresh-status" class="text-success">已开启</span>
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let autoRefreshInterval;
+        let isRefreshing = false;
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Performance monitoring page loaded');
+            console.log('DOM elements check:');
+            console.log('overall-status:', document.getElementById('overall-status'));
+            console.log('disruptor-status:', document.getElementById('disruptor-status'));
+            console.log('matching-engine-status:', document.getElementById('matching-engine-status'));
+
+            // 先显示一些基本信息
+            updateLastUpdateTime();
+
+            const overallStatus = document.getElementById('overall-status');
+            const disruptorStatus = document.getElementById('disruptor-status');
+            const matchingEngineStatus = document.getElementById('matching-engine-status');
+
+            if (overallStatus) overallStatus.textContent = '初始化中...';
+            if (disruptorStatus) disruptorStatus.textContent = '检查中...';
+            if (matchingEngineStatus) matchingEngineStatus.textContent = '检查中...';
+
+            // 立即测试一个简单的更新
+            console.log('🔧 Testing basic updates...');
+            setTimeout(() => {
+                if (overallStatus) overallStatus.textContent = '测试更新成功';
+            }, 100);
+
+            // 延迟加载数据，避免阻塞页面渲染
+            setTimeout(() => {
+                console.log('📊 Starting data refresh...');
+                refreshAllData();
+                startAutoRefresh();
+            }, 1000);
+        });
+
+        // 刷新所有数据
+        async function refreshAllData() {
+            if (isRefreshing) return;
+
+            isRefreshing = true;
+            showLoading(true);
+
+            try {
+                console.log('Refreshing all performance data...');
+
+                // 并行获取所有数据
+                const [healthData, disruptorData, websocketData] = await Promise.all([
+                    fetchHealthData(),
+                    fetchDisruptorData(),
+                    fetchWebSocketData()
+                ]);
+
+                // 更新界面
+                updateHealthStatus(healthData);
+                updateDisruptorMetrics(disruptorData);
+                updateWebSocketStats(websocketData);
+                updateLastUpdateTime();
+
+                console.log('Performance data refreshed successfully');
+
+            } catch (error) {
+                console.error('Error refreshing performance data:', error);
+                showError('刷新数据时出错: ' + error.message);
+            } finally {
+                isRefreshing = false;
+                showLoading(false);
+            }
+        }
+
+        // 获取健康状态数据
+        async function fetchHealthData() {
+            console.log('🏥 Fetching health data...');
+            try {
+                const response = await fetch('/api/performance/health');
+                console.log('Health response status:', response.status);
+                if (!response.ok) throw new Error(`获取健康状态失败: ${response.status}`);
+                const data = await response.json();
+                console.log('Health data:', data);
+                return data;
+            } catch (error) {
+                console.error('Health fetch error:', error);
+                throw error;
+            }
+        }
+
+        // 获取Disruptor数据
+        async function fetchDisruptorData() {
+            console.log('🚀 Fetching disruptor data...');
+            try {
+                const response = await fetch('/api/performance/disruptor');
+                console.log('Disruptor response status:', response.status);
+                if (!response.ok) throw new Error(`获取Disruptor数据失败: ${response.status}`);
+                const data = await response.json();
+                console.log('Disruptor data:', data);
+                return data;
+            } catch (error) {
+                console.error('Disruptor fetch error:', error);
+                throw error;
+            }
+        }
+
+        // 获取WebSocket推送数据
+        async function fetchWebSocketData() {
+            console.log('🔌 Fetching websocket data...');
+            try {
+                const response = await fetch('/api/performance/websocket-push');
+                console.log('WebSocket response status:', response.status);
+                if (!response.ok) throw new Error(`获取WebSocket数据失败: ${response.status}`);
+                const data = await response.json();
+                console.log('WebSocket data:', data);
+                return data;
+            } catch (error) {
+                console.error('WebSocket fetch error:', error);
+                throw error;
+            }
+        }
+
+        // 更新健康状态
+        function updateHealthStatus(data) {
+            console.log('📊 Updating health status with data:', data);
+            const overallStatus = document.getElementById('overall-status');
+            const disruptorStatus = document.getElementById('disruptor-status');
+            const matchingEngineStatus = document.getElementById('matching-engine-status');
+
+            console.log('DOM elements for health:', {
+                overallStatus: overallStatus,
+                disruptorStatus: disruptorStatus,
+                matchingEngineStatus: matchingEngineStatus
+            });
+
+            if (data && data.status) {
+                console.log('Setting health status texts...');
+                if (overallStatus) overallStatus.textContent = getStatusText(data.status);
+                if (disruptorStatus) disruptorStatus.textContent = getStatusText(data.disruptor);
+                if (matchingEngineStatus) matchingEngineStatus.textContent = getStatusText(data.matchingEngine);
+
+                // 更新状态指示器
+                updateStatusIndicators(data);
+                console.log('✅ Health status updated successfully');
+            } else {
+                console.warn('⚠️ No data or status field in health data');
+            }
+        }
+
+        // 更新Disruptor指标
+        function updateDisruptorMetrics(data) {
+            if (data && data.disruptorStats) {
+                const stats = parseDisruptorStats(data.disruptorStats);
+                document.getElementById('ring-buffer-cursor').textContent = stats.cursor || '-';
+                document.getElementById('ring-buffer-capacity').textContent = stats.capacity || '-';
+            }
+        }
+
+        // 更新WebSocket统计
+        function updateWebSocketStats(data) {
+            if (data && data.overall) {
+                const stats = parseThreadPoolStats(data.overall);
+                document.getElementById('thread-pool-active').textContent = stats.active || '-';
+                document.getElementById('thread-pool-queue').textContent = stats.queue || '-';
+                document.getElementById('thread-pool-size').textContent = stats.poolSize || '-';
+                document.getElementById('thread-pool-completed').textContent = stats.completed || '-';
+            }
+        }
+
+        // 解析Disruptor统计信息
+        function parseDisruptorStats(statsString) {
+            const stats = {};
+            if (typeof statsString === 'string') {
+                const cursorMatch = statsString.match(/Cursor: (\d+)/);
+                const capacityMatch = statsString.match(/Remaining Capacity: (\d+)/);
+
+                stats.cursor = cursorMatch ? cursorMatch[1] : '-';
+                stats.capacity = capacityMatch ? capacityMatch[1] : '-';
+            }
+            return stats;
+        }
+
+        // 解析线程池统计信息
+        function parseThreadPoolStats(statsString) {
+            const stats = {};
+            if (typeof statsString === 'string') {
+                const activeMatch = statsString.match(/Active: (\d+)/);
+                const poolSizeMatch = statsString.match(/Pool: (\d+)/);
+                const queueMatch = statsString.match(/Queue: (\d+)/);
+                const completedMatch = statsString.match(/Completed: (\d+)/);
+
+                stats.active = activeMatch ? activeMatch[1] : '-';
+                stats.poolSize = poolSizeMatch ? poolSizeMatch[1] : '-';
+                stats.queue = queueMatch ? queueMatch[1] : '-';
+                stats.completed = completedMatch ? completedMatch[1] : '-';
+            }
+            return stats;
+        }
+
+        // 获取状态文本
+        function getStatusText(status) {
+            switch(status) {
+                case 'healthy': return '健康';
+                case 'running': return '运行中';
+                case 'degraded': return '降级';
+                case 'error': return '错误';
+                case 'not_available': return '不可用';
+                default: return '未知';
+            }
+        }
+
+        // 更新状态指示器
+        function updateStatusIndicators(data) {
+            const indicators = document.querySelectorAll('.status-indicator');
+            indicators.forEach((indicator, index) => {
+                indicator.className = 'status-indicator';
+
+                let status;
+                switch(index) {
+                    case 0: status = data.status; break;
+                    case 1: status = data.disruptor; break;
+                    case 2: status = data.matchingEngine; break;
+                }
+
+                if (status === 'healthy' || status === 'running') {
+                    indicator.classList.add('status-healthy');
+                } else if (status === 'degraded') {
+                    indicator.classList.add('status-warning');
+                } else if (status === 'error') {
+                    indicator.classList.add('status-error');
+                } else {
+                    indicator.classList.add('status-unknown');
+                }
+            });
+        }
+
+        // 显示加载状态
+        function showLoading(show) {
+            const spinner = document.querySelector('.loading-spinner');
+            if (spinner) {
+                spinner.style.display = show ? 'block' : 'none';
+            }
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            console.error(message);
+            // 这里可以添加toast通知或其他错误显示
+        }
+
+        // 更新最后更新时间
+        function updateLastUpdateTime() {
+            const now = new Date();
+            document.getElementById('last-update-time').textContent = now.toLocaleTimeString();
+        }
+
+        // 开始自动刷新
+        function startAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+
+            autoRefreshInterval = setInterval(() => {
+                console.log('Auto-refreshing performance data...');
+                refreshAllData();
+            }, 5000); // 每5秒刷新一次
+
+            document.getElementById('auto-refresh-status').textContent = '已开启';
+        }
+
+        // 停止自动刷新
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+            document.getElementById('auto-refresh-status').textContent = '已关闭';
+        }
+
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', function() {
+            stopAutoRefresh();
+        });
+    </script>
+</div>
+
+</html>

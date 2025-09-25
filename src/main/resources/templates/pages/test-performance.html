@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<!-- Test Performance Monitoring Content Fragment -->
+<div th:fragment="content">
+    <style>
+        .test-card {
+            border: 2px solid #28a745;
+            padding: 20px;
+            margin: 20px 0;
+            background: white;
+        }
+
+        body.dark-theme .test-card {
+            background: #1a1a1a;
+            color: #fff;
+        }
+    </style>
+
+    <h1>性能监控测试页面</h1>
+
+    <div class="test-card">
+        <h3>基础功能测试</h3>
+        <p>状态: <span id="test-status">初始化中...</span></p>
+        <p>时间: <span id="test-time">-</span></p>
+        <button onclick="testBasicFunction()">测试基础功能</button>
+    </div>
+
+    <div class="test-card">
+        <h3>API测试结果</h3>
+        <div id="api-results">
+            <p>Health API: <span id="health-result">测试中...</span></p>
+            <p>Disruptor API: <span id="disruptor-result">测试中...</span></p>
+            <p>WebSocket API: <span id="websocket-result">测试中...</span></p>
+        </div>
+        <button onclick="testAllAPIs()">测试所有API</button>
+    </div>
+
+    <script>
+        console.log('🧪 Test performance page loaded');
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('✅ DOM Content Loaded');
+
+            // 更新时间
+            updateTime();
+
+            // 设置状态
+            const statusEl = document.getElementById('test-status');
+            if (statusEl) {
+                statusEl.textContent = 'DOM加载完成';
+                console.log('✅ Status updated');
+            }
+
+            // 自动测试API
+            setTimeout(() => {
+                testAllAPIs();
+            }, 1000);
+        });
+
+        function updateTime() {
+            const timeEl = document.getElementById('test-time');
+            if (timeEl) {
+                timeEl.textContent = new Date().toLocaleTimeString();
+            }
+        }
+
+        function testBasicFunction() {
+            console.log('🔧 Testing basic function');
+            const statusEl = document.getElementById('test-status');
+            if (statusEl) {
+                statusEl.textContent = '基础功能正常';
+            }
+            updateTime();
+            alert('基础JavaScript功能正常!');
+        }
+
+        async function testAllAPIs() {
+            console.log('🌐 Testing all APIs');
+
+            // Test Health API
+            try {
+                console.log('Testing health API...');
+                const healthResponse = await fetch('/api/performance/health');
+                const healthData = await healthResponse.json();
+                console.log('Health API response:', healthData);
+                document.getElementById('health-result').textContent = healthData.status || 'OK';
+                document.getElementById('health-result').style.color = 'green';
+            } catch (error) {
+                console.error('Health API error:', error);
+                document.getElementById('health-result').textContent = 'Error: ' + error.message;
+                document.getElementById('health-result').style.color = 'red';
+            }
+
+            // Test Disruptor API
+            try {
+                console.log('Testing disruptor API...');
+                const disruptorResponse = await fetch('/api/performance/disruptor');
+                const disruptorData = await disruptorResponse.json();
+                console.log('Disruptor API response:', disruptorData);
+                document.getElementById('disruptor-result').textContent = disruptorData.status || 'OK';
+                document.getElementById('disruptor-result').style.color = 'green';
+            } catch (error) {
+                console.error('Disruptor API error:', error);
+                document.getElementById('disruptor-result').textContent = 'Error: ' + error.message;
+                document.getElementById('disruptor-result').style.color = 'red';
+            }
+
+            // Test WebSocket API
+            try {
+                console.log('Testing websocket API...');
+                const websocketResponse = await fetch('/api/performance/websocket-push');
+                const websocketData = await websocketResponse.json();
+                console.log('WebSocket API response:', websocketData);
+                document.getElementById('websocket-result').textContent = websocketData.status || 'OK';
+                document.getElementById('websocket-result').style.color = 'green';
+            } catch (error) {
+                console.error('WebSocket API error:', error);
+                document.getElementById('websocket-result').textContent = 'Error: ' + error.message;
+                document.getElementById('websocket-result').style.color = 'red';
+            }
+
+            console.log('✅ API testing completed');
+        }
+
+        // 每秒更新时间
+        setInterval(updateTime, 1000);
+    </script>
+</div>
+
+</html>
