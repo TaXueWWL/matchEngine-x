@@ -20036,3 +20036,43 @@
 2025-09-25 17:16:53.801 - Sell order placed: orderId=360, price=38558.71, quantity=0.4714
 2025-09-25 17:16:54.803 - Buy order placed: orderId=361, price=32215.30, quantity=0.4471
 2025-09-25 17:16:54.804 - Sell order placed: orderId=362, price=57155.18, quantity=0.0791
+2025-09-25 17:16:55.796 - Buy order placed: orderId=363, price=101317.63, quantity=0.1143
+2025-09-25 17:16:55.796 - Sell order placed: orderId=364, price=34291.53, quantity=0.2616
+2025-09-25 17:16:56.801 - Buy order placed: orderId=365, price=76267.09, quantity=0.0204
+2025-09-25 17:16:56.801 - Sell order placed: orderId=366, price=94389.19, quantity=0.0841
+2025-09-25 17:16:57.788 - Buy order placed: orderId=367, price=92524.04, quantity=0.1892
+2025-09-25 17:16:57.789 - Sell order placed: orderId=368, price=57192.18, quantity=0.1957
+2025-09-25 17:16:57.789 - Triggering trade after 3325 orders
+2025-09-25 17:16:57.847 - Trade triggered: sellOrder=369 at 119643.47, buyOrder=370 at 119843.47, quantity=0.1028
+2025-09-25 17:16:58.805 - Buy order placed: orderId=371, price=118154.55, quantity=0.1883
+2025-09-25 17:16:58.806 - Sell order placed: orderId=372, price=50422.67, quantity=0.0248
+2025-09-25 17:16:59.788 - Buy order placed: orderId=373, price=71124.89, quantity=0.3520
+2025-09-25 17:16:59.788 - Sell order placed: orderId=374, price=117927.49, quantity=0.4540
+2025-09-25 17:17:00.791 - Buy order placed: orderId=375, price=91692.32, quantity=0.3921
+2025-09-25 17:17:00.791 - Sell order placed: orderId=376, price=52266.41, quantity=0.2353
+2025-09-25 17:17:01.792 - Buy order placed: orderId=377, price=58396.60, quantity=0.4106
+2025-09-25 17:17:01.792 - Sell order placed: orderId=378, price=119726.10, quantity=0.2847
+2025-09-25 17:17:02.802 - Buy order placed: orderId=379, price=118154.96, quantity=0.2089
+2025-09-25 17:17:02.803 - Sell order placed: orderId=380, price=75538.74, quantity=0.0909
+2025-09-25 17:17:02.803 - Triggering trade after 3330 orders
+2025-09-25 17:17:02.862 - Trade triggered: sellOrder=381 at 111621.60, buyOrder=382 at 111821.60, quantity=0.2403
+2025-09-25 17:17:03.811 - Buy order placed: orderId=383, price=87120.28, quantity=0.1149
+2025-09-25 17:17:03.811 - Sell order placed: orderId=384, price=84770.91, quantity=0.3241
+2025-09-25 17:17:04.797 - Buy order placed: orderId=385, price=79100.93, quantity=0.4457
+2025-09-25 17:17:04.797 - Sell order placed: orderId=386, price=60283.36, quantity=0.0368
+2025-09-25 17:17:05.791 - Buy order placed: orderId=387, price=50362.76, quantity=0.0628
+2025-09-25 17:17:05.792 - Sell order placed: orderId=388, price=108313.55, quantity=0.0100
+2025-09-25 17:17:06.801 - Buy order placed: orderId=389, price=47606.39, quantity=0.3183
+2025-09-25 17:17:06.802 - Sell order placed: orderId=390, price=89932.74, quantity=0.2014
+2025-09-25 17:17:07.794 - Buy order placed: orderId=391, price=39587.56, quantity=0.2857
+2025-09-25 17:17:07.794 - Sell order placed: orderId=392, price=103163.43, quantity=0.0477
+2025-09-25 17:17:07.794 - Triggering trade after 3335 orders
+2025-09-25 17:17:07.853 - Trade triggered: sellOrder=393 at 80996.30, buyOrder=394 at 81196.30, quantity=0.4041
+2025-09-25 17:17:08.802 - Buy order placed: orderId=395, price=60061.68, quantity=0.2767
+2025-09-25 17:17:08.802 - Sell order placed: orderId=396, price=65995.27, quantity=0.4184
+2025-09-25 17:17:09.798 - Buy order placed: orderId=397, price=55753.08, quantity=0.0345
+2025-09-25 17:17:09.799 - Sell order placed: orderId=398, price=94190.66, quantity=0.4314
+2025-09-25 17:17:10.801 - Buy order placed: orderId=399, price=102191.26, quantity=0.3752
+2025-09-25 17:17:10.802 - Sell order placed: orderId=400, price=88278.26, quantity=0.4788
+2025-09-25 17:17:11.799 - Buy order placed: orderId=401, price=91683.19, quantity=0.0771
+2025-09-25 17:17:11.799 - Sell order placed: orderId=402, price=61788.62, quantity=0.3922
