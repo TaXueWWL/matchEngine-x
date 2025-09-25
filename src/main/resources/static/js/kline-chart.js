@@ -12,12 +12,7 @@ class KlineChart {
         this.volumeSeries = null;
         this.symbol = options.symbol || 'BTCUSDT';
         this.timeframe = options.timeframe || '1m';
-        this.stompClient = options.stompClient || null;
-        this.sessionId = options.sessionId || this.generateSessionId();
         this.lastKnownPrice = null; // 用于心跳数据的价格参考
-        // 保存订阅对象引用以便正确取消订阅
-        this.updateSubscription = null;
-        this.initialSubscription = null;
         // 定时刷新相关
         this.refreshTimer = null;
         this.refreshInterval = 3000; // 3秒刷新一次
@@ -172,15 +167,11 @@ class KlineChart {
             // Load initial data - 加载初始数据
             this.loadInitialData();
 
-            // Subscribe to real-time updates if WebSocket is available - 如果WebSocket可用则订阅实时更新
-            if (this.stompClient && this.stompClient.connected) {
-                this.subscribeToUpdates();
-            } else {
-                console.log('WebSocket not ready, K-line chart will show historical data only');
-            }
-
             // Start auto-refresh timer - 启动自动刷新定时器
             this.startAutoRefresh();
+
+            // 监听页面可见性变化，当页面重新变为可见时立即刷新一次
+            this.setupVisibilityChangeHandler();
 
             console.log('K-line chart initialized for', this.symbol, this.timeframe);
 
@@ -286,99 +277,6 @@ class KlineChart {
         }
     }
 
-    /**
-     * Subscribe to real-time K-line updates via WebSocket - 通过WebSocket订阅实时K线更新
-     */
-    subscribeToUpdates() {
-        if (!this.stompClient) {
-            console.log('WebSocket client not available, skipping K-line subscription');
-            return;
-        }
-
-        if (!this.stompClient.connected) {
-            console.warn('WebSocket not connected, cannot subscribe to K-line updates');
-            return;
-        }
-
-        try {
-            // 先取消之前的订阅
-            this.unsubscribeFromWebSocketTopics();
-
-            // Subscribe to real-time K-line updates - 订阅实时K线更新
-            const updateTopic = `/topic/kline/${this.symbol}/${this.timeframe}`;
-            console.log(`🔔 Subscribing to K-line updates: ${updateTopic}`);
-            this.updateSubscription = this.stompClient.subscribe(updateTopic, (message) => {
-                console.log(`📈 [MAIN CHART] Received K-line update for ${this.symbol}/${this.timeframe}:`, message);
-                console.log(`📈 [MAIN CHART] Message body length:`, message.body ? message.body.length : 0);
-                console.log(`📈 [MAIN CHART] Raw message body:`, message.body);
-
-                try {
-                    const kline = JSON.parse(message.body);
-                    console.log(`📊 [MAIN CHART] Parsed K-line data:`, {
-                        symbol: kline.symbol,
-                        timeframe: kline.timeframe,
-                        timestamp: new Date(kline.timestamp * 1000),
-                        open: kline.open,
-                        high: kline.high,
-                        low: kline.low,
-                        close: kline.close,
-                        volume: kline.volume,
-                        amount: kline.amount,
-                        tradeCount: kline.tradeCount,
-                        allPricesZero: (kline.open == 0 && kline.high == 0 && kline.low == 0 && kline.close == 0)
-                    });
-
-                    // 检查是否是价格为0的数据
-                    const isZeroPriceData = kline.open == 0 && kline.high == 0 && kline.low == 0 && kline.close == 0;
-                    if (isZeroPriceData) {
-                        console.log(`🔍 [MAIN CHART] Received zero-price K-line data - processing anyway:`, {
-                            symbol: kline.symbol,
-                            timeframe: kline.timeframe,
-                            timestamp: kline.timestamp,
-                            volume: kline.volume
-                        });
-                    }
-
-                    this.updateChart(kline);
-                } catch (error) {
-                    console.error(`❌ [MAIN CHART] Error parsing K-line message:`, error);
-                    console.error(`❌ [MAIN CHART] Problematic message body:`, message.body);
-                }
-            });
-
-            // Subscribe to initial data push - 订阅初始数据推送
-            const initialTopic = `/topic/kline/${this.symbol}/${this.timeframe}/initial`;
-            console.log(`🔔 Subscribing to initial K-line data: ${initialTopic}`);
-            this.initialSubscription = this.stompClient.subscribe(initialTopic, (message) => {
-                console.log(`📊 Received initial K-line data for ${this.symbol}/${this.timeframe}:`, message);
-                const klines = JSON.parse(message.body);
-                console.log(`📈 Initial K-line data count: ${klines ? klines.length : 0}`, klines);
-                if (klines && klines.length > 0 && this.candlestickSeries) {
-                    const candleData = this.transformKlineData(klines);
-                    console.log(`📊 Transformed candle data:`, candleData);
-                    this.candlestickSeries.setData(candleData);
-                    if (this.chart) {
-                        this.chart.timeScale().fitContent();
-                    }
-                    console.log(`✅ Initial K-line chart updated with ${candleData.length} data points`);
-                }
-            });
-
-            // Send subscription request - 发送订阅请求
-            const subscriptionData = {
-                symbol: this.symbol,
-                timeframe: this.timeframe,
-                sessionId: this.sessionId
-            };
-            console.log(`📤 Sending K-line subscription request:`, subscriptionData);
-            this.stompClient.send('/app/kline/subscribe', {}, JSON.stringify(subscriptionData));
-
-            console.log('Subscribed to K-line updates:', this.symbol, this.timeframe);
-
-        } catch (error) {
-            console.error('Error subscribing to K-line updates:', error);
-        }
-    }
 
     /**
      * Update chart with new K-line data - 使用新的K线数据更新图表
@@ -414,7 +312,7 @@ class KlineChart {
                 return;
             }
 
-            if (candleData && this.candlestickSeries) {
+            if (candleData && this.candlestickSeries && this.validateCandleData(candleData)) {
                 try {
                     this.candlestickSeries.update(candleData);
 
@@ -491,8 +389,13 @@ class KlineChart {
             }
 
             // 确保timestamp是有效的数字
-            const timestamp = kline.timestamp;
-            if (!timestamp || isNaN(timestamp) || timestamp <= 0) {
+            let timestamp = kline.timestamp;
+            if (timestamp === null || timestamp === undefined) {
+                console.warn(`⚠️ Null/undefined timestamp at index ${index}:`, timestamp);
+                return null;
+            }
+            timestamp = parseFloat(timestamp);
+            if (!timestamp || isNaN(timestamp) || !isFinite(timestamp) || timestamp <= 0) {
                 console.warn(`⚠️ Invalid timestamp at index ${index}:`, timestamp);
                 return null;
             }
@@ -513,8 +416,9 @@ class KlineChart {
 
             // 解析价格数据并确保是有效数字
             const parsePrice = (value) => {
+                if (value === null || value === undefined) return 0;
                 const num = parseFloat(value);
-                return isNaN(num) ? 0 : num;
+                return isNaN(num) || !isFinite(num) ? 0 : num;
             };
 
             const transformedData = {
@@ -538,7 +442,7 @@ class KlineChart {
                 console.log(`💓 Heartbeat K-line data (all prices zero) for timestamp ${kline.timestamp} - displaying as flat line`);
                 // 获取前一个K线的收盘价作为水平线价格，如果没有则使用很小的值
                 const lastPrice = this.getLastPrice();
-                if (lastPrice && lastPrice > 0) {
+                if (lastPrice && typeof lastPrice === 'number' && lastPrice > 0 && isFinite(lastPrice)) {
                     transformedData.open = lastPrice;
                     transformedData.high = lastPrice;
                     transformedData.low = lastPrice;
@@ -586,11 +490,21 @@ class KlineChart {
             // 确保价格数据不包含null、undefined或NaN
             const prices = [data.open, data.high, data.low, data.close];
             const hasInvalidPrice = prices.some(price =>
-                price === null || price === undefined || isNaN(price)
+                price === null || price === undefined || isNaN(price) || !isFinite(price)
             );
 
             if (hasInvalidPrice) {
                 console.warn(`⚠️ Filtered out data with invalid prices:`, data);
+                return false;
+            }
+
+            // 最后验证所有属性都不为null
+            if (data.time === null || data.time === undefined ||
+                data.open === null || data.open === undefined ||
+                data.high === null || data.high === undefined ||
+                data.low === null || data.low === undefined ||
+                data.close === null || data.close === undefined) {
+                console.warn(`⚠️ Filtered out data with null values:`, data);
                 return false;
             }
 
@@ -608,9 +522,6 @@ class KlineChart {
 
         console.log('Changing timeframe from', this.timeframe, 'to', newTimeframe);
 
-        // Unsubscribe from current timeframe - 取消订阅当前时间框架
-        this.unsubscribeFromUpdates();
-
         // Update timeframe - 更新时间框架
         this.timeframe = newTimeframe;
 
@@ -621,13 +532,6 @@ class KlineChart {
 
         // Load new data - 加载新数据
         this.loadInitialData();
-
-        // Subscribe to new timeframe only if WebSocket is connected - 仅在WebSocket连接时订阅新时间框架
-        if (this.stompClient && this.stompClient.connected) {
-            this.subscribeToUpdates();
-        } else {
-            console.log('WebSocket not connected, will subscribe when connection is established');
-        }
     }
 
     /**
@@ -640,9 +544,6 @@ class KlineChart {
 
         console.log('Changing symbol from', this.symbol, 'to', newSymbol);
 
-        // Unsubscribe from current symbol - 取消订阅当前交易对
-        this.unsubscribeFromUpdates();
-
         // Update symbol - 更新交易对
         this.symbol = newSymbol;
 
@@ -653,52 +554,8 @@ class KlineChart {
 
         // Load new data - 加载新数据
         this.loadInitialData();
-
-        // Subscribe to new symbol - 订阅新交易对
-        this.subscribeToUpdates();
     }
 
-    /**
-     * 取消WebSocket主题订阅（仅取消客户端订阅，不发送后端取消订阅请求）
-     */
-    unsubscribeFromWebSocketTopics() {
-        try {
-            if (this.updateSubscription) {
-                console.log('🔕 Unsubscribing from K-line update topic');
-                this.updateSubscription.unsubscribe();
-                this.updateSubscription = null;
-            }
-            if (this.initialSubscription) {
-                console.log('🔕 Unsubscribing from K-line initial topic');
-                this.initialSubscription.unsubscribe();
-                this.initialSubscription = null;
-            }
-        } catch (error) {
-            console.error('❌ Error unsubscribing from WebSocket topics:', error);
-        }
-    }
-
-    /**
-     * Unsubscribe from real-time updates - 取消订阅实时更新
-     */
-    unsubscribeFromUpdates() {
-        // 取消WebSocket主题订阅
-        this.unsubscribeFromWebSocketTopics();
-
-        // 发送后端取消订阅请求
-        if (this.stompClient && this.stompClient.connected) {
-            try {
-                this.stompClient.send('/app/kline/unsubscribe', {}, JSON.stringify({
-                    symbol: this.symbol,
-                    timeframe: this.timeframe,
-                    sessionId: this.sessionId
-                }));
-                console.log('📤 Sent unsubscribe request to backend:', this.symbol, this.timeframe);
-            } catch (error) {
-                console.error('❌ Error sending unsubscribe request:', error);
-            }
-        }
-    }
 
     /**
      * Handle window resize - 处理窗口大小调整
@@ -758,55 +615,6 @@ class KlineChart {
         }
     }
 
-    /**
-     * Generate unique session ID - 生成唯一会话ID
-     */
-    generateSessionId() {
-        return 'kline_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-    }
-
-    /**
-     * Enable real-time updates when WebSocket becomes available - WebSocket可用时启用实时更新
-     */
-    enableRealtimeUpdates(stompClient) {
-        console.log(`🚀 Enabling real-time updates for K-line chart:`, {
-            symbol: this.symbol,
-            timeframe: this.timeframe,
-            hasStompClient: !!stompClient,
-            isConnected: stompClient && stompClient.connected,
-            stompState: stompClient && stompClient.state,
-            connectionDetails: stompClient ? {
-                connected: stompClient.connected,
-                state: stompClient.state
-            } : null
-        });
-
-        // Check connection with both legacy and new API compatibility
-        const isConnected = stompClient && (
-            stompClient.connected ||
-            (stompClient.state && stompClient.state === 'CONNECTED')
-        );
-
-        if (stompClient && isConnected) {
-            this.stompClient = stompClient;
-            console.log('🔔 Starting K-line WebSocket subscription...');
-            this.subscribeToUpdates();
-
-            // 强制重新加载数据以确保与WebSocket推送同步
-            console.log('🔄 Refreshing K-line data to sync with WebSocket...');
-            setTimeout(() => {
-                this.loadInitialData();
-            }, 1000);
-
-            console.log('✅ Real-time updates enabled for K-line chart');
-        } else {
-            console.warn('⚠️ Cannot enable real-time updates: WebSocket not connected', {
-                hasClient: !!stompClient,
-                connected: stompClient && stompClient.connected,
-                state: stompClient && stompClient.state
-            });
-        }
-    }
 
     /**
      * Start auto-refresh timer - 启动自动刷新定时器
@@ -820,13 +628,28 @@ class KlineChart {
         // 清除现有定时器
         if (this.refreshTimer) {
             clearInterval(this.refreshTimer);
+            this.refreshTimer = null;
         }
 
         console.log(`🔄 Starting auto-refresh every ${this.refreshInterval/1000} seconds`);
 
         this.refreshTimer = setInterval(() => {
-            this.refreshKlineData();
+            try {
+                // 检查页面是否可见，避免在后台标签页中进行不必要的刷新
+                if (document.hidden) {
+                    console.log('🔄 Page is hidden, skipping auto-refresh');
+                    return;
+                }
+
+                this.refreshKlineData().catch(error => {
+                    console.error('❌ Auto-refresh error:', error);
+                });
+            } catch (error) {
+                console.error('❌ Auto-refresh timer error:', error);
+            }
         }, this.refreshInterval);
+
+        console.log('✅ Auto-refresh timer started successfully');
     }
 
     /**
@@ -843,7 +666,7 @@ class KlineChart {
     /**
      * Manual refresh K-line data - 手动刷新K线数据
      */
-    async refreshKlineData() {
+    async refreshKlineData(forceReloadAll = false) {
         if (this.isRefreshing) {
             console.log('🔄 Refresh already in progress, skipping...');
             return;
@@ -851,23 +674,139 @@ class KlineChart {
 
         try {
             this.isRefreshing = true;
-            console.log('🔄 Refreshing K-line data...');
+            const startTime = Date.now();
+            console.log('🔄 Refreshing K-line data...', {
+                symbol: this.symbol,
+                timeframe: this.timeframe,
+                autoRefreshEnabled: this.autoRefreshEnabled,
+                hasTimer: !!this.refreshTimer,
+                forceReloadAll: forceReloadAll
+            });
 
             // 显示刷新指示器
             this.showRefreshIndicator();
 
-            // 重新加载数据
-            await this.loadInitialData();
+            if (forceReloadAll) {
+                // 完全重新加载所有数据（用于手动刷新或初始加载）
+                await this.loadInitialData();
+            } else {
+                // 只更新最新数据（用于定时刷新）
+                await this.updateLatestKlineData();
+            }
 
-            console.log('✅ K-line data refreshed successfully');
+            const duration = Date.now() - startTime;
+            console.log(`✅ K-line data refreshed successfully in ${duration}ms`);
 
         } catch (error) {
             console.error('❌ Error refreshing K-line data:', error);
+            // 可选：显示用户友好的错误提示
+            this.showError('数据刷新失败，请稍后重试');
         } finally {
             this.isRefreshing = false;
             // 隐藏刷新指示器
             this.hideRefreshIndicator();
         }
+    }
+
+    /**
+     * Update only the latest K-line data - 只更新最新的K线数据
+     */
+    async updateLatestKlineData() {
+        console.log(`📊 Updating latest K-line data for ${this.symbol}/${this.timeframe}...`);
+
+        try {
+            // 获取最新的几个K线数据点（用于更新当前周期）
+            const response = await fetch(`/api/kline/${this.symbol}?timeframe=${this.timeframe}&limit=2`);
+            console.log(`📡 Latest K-line API response status:`, response.status);
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch latest K-line data: ${response.status} ${response.statusText}`);
+            }
+
+            const klines = await response.json();
+            console.log(`📈 Received latest K-line data:`, {
+                responseType: typeof klines,
+                isArray: Array.isArray(klines),
+                count: klines ? klines.length : 0,
+                data: klines
+            });
+
+            if (klines && klines.length > 0 && this.candlestickSeries) {
+                // 转换最新的K线数据
+                const candleData = this.transformKlineData(klines);
+                console.log(`🔄 Transformed latest candle data:`, candleData);
+
+                if (candleData && candleData.length > 0) {
+                    // 更新最新的数据点（通常是当前未完成的K线）
+                    const latestCandle = candleData[candleData.length - 1];
+
+                    if (latestCandle && this.validateCandleData(latestCandle)) {
+                        try {
+                            console.log(`📊 Updating latest candle:`, latestCandle);
+                            this.candlestickSeries.update(latestCandle);
+
+                            // 更新最后已知价格
+                            if (latestCandle.close > 0) {
+                                this.lastKnownPrice = latestCandle.close;
+                            }
+
+                            console.log(`✅ Latest K-line data updated successfully`);
+                        } catch (updateError) {
+                            console.error('❌ Error updating latest candle:', updateError);
+                            // 如果更新失败，可能是因为时间戳问题，尝试重新加载最近的数据
+                            console.log('🔄 Update failed, trying to add as new data point...');
+
+                            // 如果有多个数据点，添加之前的数据点
+                            if (candleData.length > 1) {
+                                const prevCandle = candleData[candleData.length - 2];
+                                this.candlestickSeries.update(prevCandle);
+                            }
+                            this.candlestickSeries.update(latestCandle);
+                        }
+                    }
+                }
+            } else {
+                console.log('⚠️ No latest K-line data available from API');
+            }
+
+        } catch (error) {
+            console.error('❌ Error updating latest K-line data:', error);
+            throw error; // 重新抛出错误以便上层处理
+        }
+    }
+
+    /**
+     * Validate candle data before passing to LightweightCharts - 验证K线数据
+     */
+    validateCandleData(candle) {
+        if (!candle || typeof candle !== 'object') {
+            console.warn('⚠️ Invalid candle object:', candle);
+            return false;
+        }
+
+        // 检查必需的属性
+        const requiredProps = ['time', 'open', 'high', 'low', 'close'];
+        for (const prop of requiredProps) {
+            const value = candle[prop];
+            if (value === null || value === undefined || isNaN(value) || !isFinite(value)) {
+                console.warn(`⚠️ Invalid ${prop} value in candle:`, value, candle);
+                return false;
+            }
+        }
+
+        // 检查时间戳是否有效
+        if (candle.time <= 0) {
+            console.warn('⚠️ Invalid timestamp in candle:', candle.time);
+            return false;
+        }
+
+        // 检查OHLC关系是否有效
+        if (candle.high < candle.low) {
+            console.warn('⚠️ Invalid OHLC: high < low:', candle);
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -941,15 +880,56 @@ class KlineChart {
      * Set refresh interval - 设置刷新间隔
      */
     setRefreshInterval(intervalMs) {
+        if (!intervalMs || intervalMs < 1000 || intervalMs > 300000) {
+            console.warn('⚠️ Invalid refresh interval, must be between 1-300 seconds');
+            return;
+        }
+
         this.refreshInterval = intervalMs;
 
-        if (this.autoRefreshEnabled && this.refreshTimer) {
-            // 重启定时器以应用新间隔
+        // 如果自动刷新已启用，重启定时器以应用新间隔
+        if (this.autoRefreshEnabled) {
+            console.log(`🔄 Restarting auto-refresh with new interval: ${intervalMs/1000} seconds`);
             this.stopAutoRefresh();
             this.startAutoRefresh();
         }
 
-        console.log(`🔄 Refresh interval set to ${intervalMs/1000} seconds`);
+        console.log(`✅ Refresh interval set to ${intervalMs/1000} seconds`);
+    }
+
+    /**
+     * Setup page visibility change handler - 设置页面可见性变化处理
+     */
+    setupVisibilityChangeHandler() {
+        if (typeof document.addEventListener === 'undefined') {
+            return; // 不支持addEventListener的旧浏览器
+        }
+
+        this.visibilityChangeHandler = () => {
+            if (!document.hidden && this.autoRefreshEnabled) {
+                console.log('🔄 Page became visible, refreshing K-line data...');
+                // 页面变为可见时立即刷新一次（完全重新加载数据）
+                setTimeout(() => {
+                    this.refreshKlineData(true).catch(error => {
+                        console.error('❌ Visibility refresh error:', error);
+                    });
+                }, 100); // 稍微延迟以确保页面完全加载
+            }
+        };
+
+        document.addEventListener('visibilitychange', this.visibilityChangeHandler);
+        console.log('✅ Page visibility change handler setup complete');
+    }
+
+    /**
+     * Remove page visibility change handler - 移除页面可见性变化处理
+     */
+    removeVisibilityChangeHandler() {
+        if (this.visibilityChangeHandler && typeof document.removeEventListener !== 'undefined') {
+            document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
+            this.visibilityChangeHandler = null;
+            console.log('✅ Page visibility change handler removed');
+        }
     }
 
     /**
@@ -959,8 +939,8 @@ class KlineChart {
         // 停止自动刷新
         this.stopAutoRefresh();
 
-        // 取消订阅
-        this.unsubscribeFromUpdates();
+        // 移除页面可见性处理器
+        this.removeVisibilityChangeHandler();
 
         if (this.chart) {
             this.chart.remove();

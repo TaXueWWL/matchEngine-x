@@ -534,164 +534,42 @@ klineChart.addCandlestickSeries is not a function 错误表明：
 
 这些优化特别适合高频交易场景，能显著提升订单匹配引擎的性能！
 
-## ✅ 修复的K线图错误总结
+##  1. LightweightCharts "Value is null" 错误
 
-🐛 原始错误
+- ✅ 改进了parsePrice函数，严格检查null/undefined值
+- ✅ 增强了时间戳验证，确保不为null/undefined
+- ✅ 添加了validateCandleData方法，在传递给LightweightCharts之前验证所有数据
+- ✅ 改进了心跳数据处理，确保lastPrice不为null时才使用
+- ✅ 在所有关键数据传递点添加了严格的null值检查
 
-Uncaught TypeError: Cannot read properties of null (reading 'setData')
-at KlineChart.changeTimeframe (kline-chart.js:201:32)
+2. 历史数据被刷走的问题
 
-🔧 修复内容
+- ✅ 重构了refreshKlineData方法，添加了forceReloadAll参数
+- ✅ 新增了updateLatestKlineData方法，只更新最新数据点而不重新加载全部数据
+- ✅ 定时刷新现在使用updateLatestKlineData（保持历史数据）
+- ✅ 手动刷新使用完整重新加载（forceReloadAll=true）
+- ✅ 页面可见性变化时使用完整重新加载
 
-1. changeTimeframe方法安全检查
-   // 修复前
-   this.candlestickSeries.setData([]);
+3. 数据更新策略优化
 
-// 修复后
-if (this.candlestickSeries) {
-this.candlestickSeries.setData([]);
-}
-2. changeSymbol方法安全检查
-   if (this.candlestickSeries) {
-   this.candlestickSeries.setData([]);
-   }
-3. updateChart方法安全检查
-   if (candleData && this.candlestickSeries) {
-   this.candlestickSeries.update(candleData);
-   }
-4. loadInitialData方法安全检查
-   if (klines && klines.length > 0 && this.candlestickSeries) {
-   // 处理数据
-   if (this.chart) {
-   this.chart.timeScale().fitContent();
-   }
-   }
-5. WebSocket订阅数据安全检查
-   if (klines && klines.length > 0 && this.candlestickSeries) {
-   const candleData = this.transformKlineData(klines);
-   this.candlestickSeries.setData(candleData);
-   if (this.chart) {
-   this.chart.timeScale().fitContent();
-   }
-   }
-6. WebSocket连接后重新初始化K线图
-   stompClient.onConnect = function(frame) {
-   // ... 其他代码
+- ✅ 初始加载：使用setData加载100条历史数据
+- ✅ 定时刷新：使用update方法只更新最新2条数据
+- ✅ 手动刷新：完全重新加载所有数据
+- ✅ 页面重新可见：完全重新加载数据以确保同步
 
-   // 在交易页面重新初始化K线图
-   if (window.location.pathname === '/trading') {
-   reinitializeKlineChart();
-   }
-   };
+4. Fallback图表同步修复
 
-🎯 修复原因
+- ✅ 为FallbackKlineChart实现了相同的数据更新策略
+- ✅ 智能判断是更新现有数据点还是添加新数据点
+- ✅ 使用高性能的chart.update('none')减少动画开销
 
-问题根源：K线图在WebSocket未连接时就被初始化，导致某些情况下candlestickSeries可能为null。
+🎯 现在的工作流程：
 
-解决方案：
-- ✅ 添加空指针检查，防止运行时错误
-- ✅ WebSocket连接成功后重新初始化K线图
-- ✅ 确保所有图表操作都有安全检查
-
-现在K线功能应该能正常工作了！用户可以：
-- 🕐 切换时间框架（1秒到1小时）
-- 📊 查看实时蜡烛图
-- 🔄 通过WebSocket接收实时数据更新
-- 📈 基于真实交易数据生成K线
-
-## K线推送问题已经修复！现在：
-
-1. 修复了WebSocket初始化时机问题 - K线图初始化时不再传入null的stompClient，而是在WebSocket连接成功后再启用实时更新
-2. 修复了时间框架切换时的订阅错误 - 只有在WebSocket连接时才会尝试订阅更新
-3. 验证了K线数据生成和API功能 - 成功创建交易并生成K线数据
-
-修复要点：
-- app.js中：K线图初始化时传入stompClient: null，避免在WebSocket未连接时出错
-- kline-chart.js中：在subscribeToUpdates()和changeTimeframe()方法中增加WebSocket连接状态检查
-- fallback-kline-chart.js中：同样的修复逻辑
-
-现在K线图会：
-- 立即显示历史数据
-- WebSocket连接成功后自动启用实时推送
-- 切换时间框架时不再报错
-- 正确处理WebSocket未连接的情况
-
-## 问题已经诊断出来了：K线推送功能的核心问题在于前端WebSocket连接或订阅逻辑。
-
-现在让我总结诊断结果：
-
-问题分析
-
-1. 后端K线数据生成正常 ✅ - API查询可以获取最新数据
-2. 后端WebSocket推送逻辑正常 ✅ - 代码逻辑完整，有调度器和推送机制
-3. 问题在前端 ❌ - 页面需要手动刷新才能看到K线图
-
-根本原因
-
-K线推送系统是订阅驱动的：
-- 只有当前端成功连接WebSocket并发送订阅请求后，后端才启动对应的K线调度器
-- 如果前端WebSocket连接失败或订阅请求未发送，后端不会推送任何数据
-- 页面刷新后K线图能显示，说明历史数据加载正常，但实时推送不工作
-
-解决方案
-
-需要从以下方面入手：
-
-1. 检查前端WebSocket连接状态 - 确保连接成功建立
-2. 验证K线订阅请求 - 确保前端正确发送订阅请求给后端
-3. 调试WebSocket消息流 - 确保消息能正确收发
-
-这就是为什么"k线推送还是不生效，但是查询接口生效了"的根本原因。
-
-你想让我继续深入调试前端WebSocket连接问题吗？
-
-> 我理解后端可以定时发送空推送到前端k线，没有成交的情况下，推送价格为0的k线，有了成交记录就推送实际的价格。通过定时推送结合实时推送，是不是可以解决这个问题
-
-● 非常好的想法！你的分析很准确。通过定时推送结合实时推送确实可以解决这个问题。让我来实现这个方案：
-
-新的K线推送机制特点：
-
-1. 自动启动 - 应用启动时自动为所有支持的交易对和时间框架启动调度器
-2. 动态配置 - 交易对列表从TradingService动态获取，不再硬编码
-3. 空数据推送 - 没有交易时推送空K线数据（价格为0）
-4. 连续推送 - 确保前端能持续接收到数据，无论是否有实际交易
-
-这样的设计解决了最初的问题：前端不需要先连接WebSocket，K线推送也会自动工作，因为调度器已经在后台持续运行。
-
-现在这个方案应该能完美解决K线推送的问题！
-
-## ● 已完成K线图刷新时间的修改和动态控制功能：
-
-✅ 修改默认刷新间隔为3秒:
-- 主K线图刷新间隔: 30000ms → 3000ms
-- 备用图表刷新间隔: 30000ms → 3000ms
-
-✅ 添加刷新间隔控制界面:
-- 数字输入框（默认值3秒，范围1-300秒）
-- 应用按钮（带确认图标反馈）
-- 清晰的标签说明
-
-✅ 实现动态刷新间隔功能:
-- 输入验证（1-300秒范围检查）
-- 同时更新主图表和备用图表的刷新间隔
-- 成功提示动画（图标变为绿色对勾）
-- 全局函数 updateRefreshInterval() 可被页面调用
-
-用户现在可以通过输入框输入所需的刷新秒数，点击确认按钮即可实时调整K线图的自动刷新频率。
-
-🎯 修复的问题：
-
-- 初始显示问题：页面加载时K线图现在会立即显示历史数据
-- 从0开始显示：修复了数据转换和验证问题，确保显示真实价格
-- 需要刷新才能看到数据：现在自动加载和同步数据
-- 后台定时推送不显示：WebSocket订阅和数据同步机制已修复
-- 实时数据不连续：添加了强制刷新确保数据连续性
-
-📊 现在的工作流程：
-
-1. 页面加载 → K线图初始化 → 加载历史数据 → 显示图表
-2. WebSocket连接 → 启用实时订阅 → 强制刷新数据 → 持续接收推送
-3. 后台定时推送 → 前端接收 → 更新图表 → 保持数据连续性
+1. 页面加载：显示最近100条历史K线数据
+2. 定时刷新（每3秒）：只获取最新数据并更新当前K线，保持历史数据
+3. 手动刷新：完全重新加载所有数据，确保数据完整性
+4. 时间框架切换：重新加载对应时间框架的数据
+5. 页面重新激活：完全刷新以确保数据同步
 
 # todo
 - √ 修复bug，订单簿展示
@@ -699,17 +577,17 @@ K线推送系统是订阅驱动的：
 - √ 撤单应该把冻结的金额给加到可用余额
 - √ 自成交计算bug
 - 市价单逻辑，页面支持各种订单类型
-- k线展示
+- √ k线展示
 - √ 数据结构优化 agrona
 - 订单的状态数量异步写入mysql or redis
 - 启动从mysql or redis加载订单 ，余额
-- 操作的订单变化，资产变化都能写log到磁盘，不断更新
-- 启动加载订单簿
-- 定时打快照，快照完成的数据支持删除  用protobuf序列化打快照，恢复快照
+  - 操作的订单变化，资产变化都能写log到磁盘，不断更新
+  - 启动加载订单簿
+  - 定时打快照，快照完成的数据支持删除  用protobuf序列化打快照，恢复快照
 - 改单功能不好使，模态框不展示
 - 推送使用ringbuffer而不是直接线程就推出来
 - 用户账户机制，用户id分配机制 铺单机制，机器人
-
+- 接入大所的指数价格，根据指数价格配合机器人画k线
 
 页面展示的账户余额应该是可用余额
 最新成交价是成交发生时候的价格，规则：

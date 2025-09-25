@@ -10,11 +10,7 @@ class FallbackKlineChart {
         this.chart = null;
         this.symbol = options.symbol || 'BTCUSDT';
         this.timeframe = options.timeframe || '1m';
-        this.stompClient = options.stompClient || null;
-        this.sessionId = options.sessionId || this.generateSessionId();
         this.lastKnownPrice = null; // 用于心跳数据的价格参考
-        // 保存订阅对象引用以便正确取消订阅
-        this.updateSubscription = null;
         // 定时刷新相关
         this.refreshTimer = null;
         this.refreshInterval = 3000; // 3秒刷新一次
@@ -100,13 +96,6 @@ class FallbackKlineChart {
             // Load initial data
             this.loadInitialData();
 
-            // Subscribe to real-time updates if WebSocket is available
-            if (this.stompClient && this.stompClient.connected) {
-                this.subscribeToUpdates();
-            } else {
-                console.log('WebSocket not ready, fallback chart will show historical data only');
-            }
-
             // Start auto-refresh timer - 启动自动刷新定时器
             this.startAutoRefresh();
 
@@ -177,80 +166,6 @@ class FallbackKlineChart {
         }
     }
 
-    subscribeToUpdates() {
-        if (!this.stompClient) {
-            console.log('WebSocket client not available, skipping K-line subscription (fallback)');
-            return;
-        }
-
-        if (!this.stompClient.connected) {
-            console.warn('WebSocket not connected, cannot subscribe to K-line updates');
-            return;
-        }
-
-        try {
-            // 先取消之前的订阅
-            if (this.updateSubscription) {
-                console.log('🔕 [FALLBACK] Unsubscribing from previous K-line topic');
-                this.updateSubscription.unsubscribe();
-                this.updateSubscription = null;
-            }
-
-            const updateTopic = `/topic/kline/${this.symbol}/${this.timeframe}`;
-            console.log(`🔔 [FALLBACK] Subscribing to K-line updates: ${updateTopic}`);
-            this.updateSubscription = this.stompClient.subscribe(updateTopic, (message) => {
-                console.log(`📈 [FALLBACK] Received K-line update for ${this.symbol}/${this.timeframe}:`, message);
-                console.log(`📈 [FALLBACK] Message body length:`, message.body ? message.body.length : 0);
-                console.log(`📈 [FALLBACK] Raw message body:`, message.body);
-
-                try {
-                    const kline = JSON.parse(message.body);
-                    console.log(`📊 [FALLBACK] Parsed K-line data:`, {
-                        symbol: kline.symbol,
-                        timeframe: kline.timeframe,
-                        timestamp: new Date(kline.timestamp * 1000),
-                        open: kline.open,
-                        high: kline.high,
-                        low: kline.low,
-                        close: kline.close,
-                        volume: kline.volume,
-                        amount: kline.amount,
-                        tradeCount: kline.tradeCount,
-                        allPricesZero: (kline.open == 0 && kline.high == 0 && kline.low == 0 && kline.close == 0)
-                    });
-
-                    // 检查是否是价格为0的数据
-                    const isZeroPriceData = kline.open == 0 && kline.high == 0 && kline.low == 0 && kline.close == 0;
-                    if (isZeroPriceData) {
-                        console.log(`🔍 [FALLBACK] Received zero-price K-line data - processing anyway:`, {
-                            symbol: kline.symbol,
-                            timeframe: kline.timeframe,
-                            timestamp: kline.timestamp,
-                            volume: kline.volume
-                        });
-                    }
-
-                    this.updateChart(kline);
-                } catch (error) {
-                    console.error(`❌ [FALLBACK] Error parsing K-line message:`, error);
-                    console.error(`❌ [FALLBACK] Problematic message body:`, message.body);
-                }
-            });
-
-            const subscriptionData = {
-                symbol: this.symbol,
-                timeframe: this.timeframe,
-                sessionId: this.sessionId
-            };
-            console.log(`📤 [FALLBACK] Sending K-line subscription request:`, subscriptionData);
-            this.stompClient.send('/app/kline/subscribe', {}, JSON.stringify(subscriptionData));
-
-            console.log('Subscribed to K-line updates (fallback)');
-
-        } catch (error) {
-            console.error('Error subscribing to K-line updates:', error);
-        }
-    }
 
     updateChart(kline) {
         try {
@@ -302,7 +217,6 @@ class FallbackKlineChart {
         }
 
         console.log('Changing timeframe (fallback):', this.timeframe, '->', newTimeframe);
-        this.unsubscribeFromUpdates();
         this.timeframe = newTimeframe;
 
         // Clear data
@@ -311,13 +225,6 @@ class FallbackKlineChart {
         this.chart.update();
 
         this.loadInitialData();
-
-        // Subscribe to new timeframe only if WebSocket is connected
-        if (this.stompClient && this.stompClient.connected) {
-            this.subscribeToUpdates();
-        } else {
-            console.log('WebSocket not connected, will subscribe when connection is established (fallback)');
-        }
     }
 
     changeSymbol(newSymbol) {
@@ -326,7 +233,6 @@ class FallbackKlineChart {
         }
 
         console.log('Changing symbol (fallback):', this.symbol, '->', newSymbol);
-        this.unsubscribeFromUpdates();
         this.symbol = newSymbol;
 
         // Clear data
@@ -335,31 +241,8 @@ class FallbackKlineChart {
         this.chart.update();
 
         this.loadInitialData();
-        this.subscribeToUpdates();
     }
 
-    unsubscribeFromUpdates() {
-        // 取消WebSocket主题订阅
-        if (this.updateSubscription) {
-            console.log('🔕 [FALLBACK] Unsubscribing from K-line update topic');
-            this.updateSubscription.unsubscribe();
-            this.updateSubscription = null;
-        }
-
-        // 发送后端取消订阅请求
-        if (this.stompClient && this.stompClient.connected) {
-            try {
-                this.stompClient.send('/app/kline/unsubscribe', {}, JSON.stringify({
-                    symbol: this.symbol,
-                    timeframe: this.timeframe,
-                    sessionId: this.sessionId
-                }));
-                console.log('📤 [FALLBACK] Sent unsubscribe request to backend:', this.symbol, this.timeframe);
-            } catch (error) {
-                console.error('❌ [FALLBACK] Error sending unsubscribe request:', error);
-            }
-        }
-    }
 
     showError(message) {
         this.container.innerHTML = `
@@ -373,26 +256,7 @@ class FallbackKlineChart {
         `;
     }
 
-    enableRealtimeUpdates(stompClient) {
-        console.log(`🚀 [FALLBACK] Enabling real-time updates for K-line chart:`, {
-            symbol: this.symbol,
-            timeframe: this.timeframe,
-            hasStompClient: !!stompClient,
-            isConnected: stompClient && stompClient.connected
-        });
 
-        if (stompClient && stompClient.connected) {
-            this.stompClient = stompClient;
-            this.subscribeToUpdates();
-            console.log('✅ [FALLBACK] Real-time updates enabled for fallback K-line chart');
-        } else {
-            console.warn('⚠️ [FALLBACK] Cannot enable real-time updates: WebSocket not connected');
-        }
-    }
-
-    generateSessionId() {
-        return 'fallback_kline_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-    }
 
     /**
      * Start auto-refresh timer - 启动自动刷新定时器
@@ -411,7 +275,19 @@ class FallbackKlineChart {
         console.log(`🔄 [FALLBACK] Starting auto-refresh every ${this.refreshInterval/1000} seconds`);
 
         this.refreshTimer = setInterval(() => {
-            this.refreshKlineData();
+            try {
+                // 检查页面是否可见，避免在后台标签页中进行不必要的刷新
+                if (document.hidden) {
+                    console.log('🔄 [FALLBACK] Page is hidden, skipping auto-refresh');
+                    return;
+                }
+
+                this.refreshKlineData().catch(error => {
+                    console.error('❌ [FALLBACK] Auto-refresh error:', error);
+                });
+            } catch (error) {
+                console.error('❌ [FALLBACK] Auto-refresh timer error:', error);
+            }
         }, this.refreshInterval);
     }
 
@@ -429,7 +305,7 @@ class FallbackKlineChart {
     /**
      * Manual refresh K-line data - 手动刷新K线数据
      */
-    async refreshKlineData() {
+    async refreshKlineData(forceReloadAll = false) {
         if (this.isRefreshing) {
             console.log('🔄 [FALLBACK] Refresh already in progress, skipping...');
             return;
@@ -437,10 +313,19 @@ class FallbackKlineChart {
 
         try {
             this.isRefreshing = true;
-            console.log('🔄 [FALLBACK] Refreshing K-line data...');
+            console.log('🔄 [FALLBACK] Refreshing K-line data...', {
+                symbol: this.symbol,
+                timeframe: this.timeframe,
+                forceReloadAll: forceReloadAll
+            });
 
-            // 重新加载数据
-            await this.loadInitialData();
+            if (forceReloadAll) {
+                // 完全重新加载所有数据
+                await this.loadInitialData();
+            } else {
+                // 只更新最新数据点
+                await this.updateLatestKlineData();
+            }
 
             console.log('✅ [FALLBACK] K-line data refreshed successfully');
 
@@ -448,6 +333,66 @@ class FallbackKlineChart {
             console.error('❌ [FALLBACK] Error refreshing K-line data:', error);
         } finally {
             this.isRefreshing = false;
+        }
+    }
+
+    /**
+     * Update only the latest K-line data - 只更新最新的K线数据
+     */
+    async updateLatestKlineData() {
+        console.log(`📊 [FALLBACK] Updating latest K-line data for ${this.symbol}/${this.timeframe}...`);
+
+        try {
+            const response = await fetch(`/api/kline/${this.symbol}?timeframe=${this.timeframe}&limit=1`);
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch latest K-line data: ${response.status} ${response.statusText}`);
+            }
+
+            const klines = await response.json();
+
+            if (klines && klines.length > 0 && this.chart) {
+                const kline = klines[0];
+                const timestamp = new Date(kline.timestamp * 1000);
+                const price = parseFloat(kline.close) || this.lastKnownPrice || 0;
+
+                // 更新最后已知价格
+                if (price > 0) {
+                    this.lastKnownPrice = price;
+                }
+
+                // 检查是否需要添加新数据点还是更新现有数据点
+                if (this.chart.data.labels.length > 0) {
+                    const lastTimestamp = this.chart.data.labels[this.chart.data.labels.length - 1];
+
+                    // 如果时间戳相同，更新现有数据点；否则添加新数据点
+                    if (lastTimestamp.getTime() === timestamp.getTime()) {
+                        // 更新最后一个数据点
+                        this.chart.data.datasets[0].data[this.chart.data.datasets[0].data.length - 1] = price;
+                    } else {
+                        // 添加新数据点
+                        this.chart.data.labels.push(timestamp);
+                        this.chart.data.datasets[0].data.push(price);
+
+                        // 保持最多50个数据点
+                        if (this.chart.data.labels.length > 50) {
+                            this.chart.data.labels.shift();
+                            this.chart.data.datasets[0].data.shift();
+                        }
+                    }
+                } else {
+                    // 如果没有数据，添加第一个数据点
+                    this.chart.data.labels.push(timestamp);
+                    this.chart.data.datasets[0].data.push(price);
+                }
+
+                this.chart.update('none'); // 使用 'none' 动画模式提高性能
+                console.log(`✅ [FALLBACK] Latest K-line data updated successfully`);
+            }
+
+        } catch (error) {
+            console.error('❌ [FALLBACK] Error updating latest K-line data:', error);
+            throw error;
         }
     }
 
@@ -486,9 +431,6 @@ class FallbackKlineChart {
     destroy() {
         // 停止自动刷新
         this.stopAutoRefresh();
-
-        // 取消订阅
-        this.unsubscribeFromUpdates();
 
         if (this.chart) {
             this.chart.destroy();
