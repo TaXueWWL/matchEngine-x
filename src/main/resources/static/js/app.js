@@ -7,6 +7,10 @@ let currentSymbol = 'BTCUSDT';
 let priceChart = null;
 let klineChart = null;
 
+// Current orders refresh variables - 当前订单刷新变量
+let currentOrdersRefreshInterval = null;
+let isCurrentOrdersRefreshEnabled = true;
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOMContentLoaded fired, initializing app...');
@@ -429,8 +433,13 @@ function initTradingPage() {
     if (currentTab) {
         currentTab.addEventListener('shown.bs.tab', function() {
             loadCurrentOrders();
+            // Start auto-refresh when current orders tab is shown - 当前订单标签显示时启动自动刷新
+            startCurrentOrdersAutoRefresh();
         });
     }
+
+    // Start auto-refresh on page load - 页面加载时启动自动刷新
+    startCurrentOrdersAutoRefresh();
 }
 
 function loadOrderBook() {
@@ -847,6 +856,7 @@ function loadCurrentOrders() {
         .then(response => response.json())
         .then(orders => {
             updateCurrentOrders(orders);
+            console.log(`✅ Current orders loaded: ${orders.length} orders for user ${currentUserId}`);
         })
         .catch(error => {
             console.error('Error loading current orders:', error);
@@ -861,6 +871,84 @@ function loadCurrentOrders() {
                 `;
             }
         });
+}
+
+/**
+ * Start automatic refresh of current orders - 开始自动刷新当前订单
+ */
+function startCurrentOrdersAutoRefresh() {
+    // Clear existing interval if any - 清除现有的定时器
+    if (currentOrdersRefreshInterval) {
+        clearInterval(currentOrdersRefreshInterval);
+    }
+
+    if (!isCurrentOrdersRefreshEnabled) {
+        console.log('⏸️ Current orders auto-refresh is disabled');
+        return;
+    }
+
+    // Set up new interval - 设置新的定时器
+    currentOrdersRefreshInterval = setInterval(() => {
+        // Only refresh if current orders tab is active - 只在当前订单标签激活时刷新
+        const activeTab = document.querySelector('#orderTabs .nav-link.active');
+        if (activeTab && activeTab.getAttribute('data-bs-target') === '#current-orders') {
+            console.log('🔄 Auto-refreshing current orders...');
+            loadCurrentOrders();
+        }
+    }, 2000); // 2秒刷新一次
+
+    console.log('⏰ Current orders auto-refresh started (every 2 seconds)');
+}
+
+/**
+ * Stop automatic refresh of current orders - 停止自动刷新当前订单
+ */
+function stopCurrentOrdersAutoRefresh() {
+    if (currentOrdersRefreshInterval) {
+        clearInterval(currentOrdersRefreshInterval);
+        currentOrdersRefreshInterval = null;
+        console.log('⏹️ Current orders auto-refresh stopped');
+    }
+}
+
+/**
+ * Toggle automatic refresh of current orders - 切换自动刷新状态
+ */
+function toggleCurrentOrdersAutoRefresh() {
+    isCurrentOrdersRefreshEnabled = !isCurrentOrdersRefreshEnabled;
+
+    if (isCurrentOrdersRefreshEnabled) {
+        startCurrentOrdersAutoRefresh();
+    } else {
+        stopCurrentOrdersAutoRefresh();
+    }
+
+    // Update UI indicator if exists - 更新UI指示器
+    updateAutoRefreshIndicator();
+
+    console.log(`🔄 Current orders auto-refresh ${isCurrentOrdersRefreshEnabled ? 'enabled' : 'disabled'}`);
+}
+
+/**
+ * Update auto-refresh indicator in UI - 更新UI中的自动刷新指示器
+ */
+function updateAutoRefreshIndicator() {
+    const indicator = document.getElementById('current-orders-auto-refresh-status');
+    const toggleBtn = document.getElementById('auto-refresh-toggle-btn');
+
+    if (indicator) {
+        indicator.textContent = isCurrentOrdersRefreshEnabled ? '自动刷新: 开启' : '自动刷新: 关闭';
+        indicator.className = isCurrentOrdersRefreshEnabled ? 'text-success' : 'text-muted';
+    }
+
+    if (toggleBtn) {
+        const icon = toggleBtn.querySelector('i');
+        if (icon) {
+            icon.className = isCurrentOrdersRefreshEnabled ? 'fas fa-pause' : 'fas fa-play';
+        }
+        toggleBtn.className = isCurrentOrdersRefreshEnabled ?
+            'btn btn-outline-success' : 'btn btn-outline-warning';
+    }
 }
 
 function loadOrderHistory() {
