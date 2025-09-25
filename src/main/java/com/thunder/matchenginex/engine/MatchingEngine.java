@@ -411,6 +411,10 @@ public class MatchingEngine {
                     trade.getTradeId(), trade.getSymbol(), trade.getPrice(), trade.getQuantity(),
                     trade.getBuyOrderId(), trade.getSellOrderId());
 
+            // Add trade to order book's recent trades list - 将成交记录添加到订单簿的最近成交列表
+            OrderBook orderBook = orderBookManager.getOrderBook(trade.getSymbol());
+            orderBook.addTrade(trade);
+
             // Execute the actual fund transfer - 执行实际的资金转移
             executeFundTransfer(trade);
 

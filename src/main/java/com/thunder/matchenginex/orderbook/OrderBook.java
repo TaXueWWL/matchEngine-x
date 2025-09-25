@@ -2,6 +2,7 @@ package com.thunder.matchenginex.orderbook;
 
 import com.thunder.matchenginex.enums.OrderSide;
 import com.thunder.matchenginex.model.Order;
+import com.thunder.matchenginex.model.Trade;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.agrona.collections.Long2ObjectHashMap;
@@ -31,6 +32,10 @@ public class OrderBook {
 
     // Historical orders (completed orders: FILLED, CANCELLED, REJECTED) - 历史Order (已完成的Order：FILLED, CANCELLED, REJECTED)
     private final MutableLongObjectMap<Order> historicalOrders = new LongObjectHashMap<>();
+
+    // Recent trades (up to 30 recent trades) - 最近成交记录 (最多30笔)
+    private final LinkedList<Trade> recentTrades = new LinkedList<>();
+    private static final int MAX_RECENT_TRADES = 30;
 
     public OrderBook(String symbol) {
         this.symbol = symbol;
@@ -257,5 +262,39 @@ public class OrderBook {
         public BigDecimal getPrice() { return price; }
         public BigDecimal getTotalQuantity() { return totalQuantity; }
         public int getOrderCount() { return orderCount; }
+    }
+
+    /**
+     * Add a trade to recent trades list
+     * 将成交记录添加到最近成交列表
+     */
+    public synchronized void addTrade(Trade trade) {
+        recentTrades.addFirst(trade); // Add to front for chronological order (newest first)
+
+        // Keep only the most recent MAX_RECENT_TRADES trades
+        while (recentTrades.size() > MAX_RECENT_TRADES) {
+            recentTrades.removeLast();
+        }
+
+        log.debug("Added trade {} to recent trades list for symbol {}", trade.getTradeId(), symbol);
+    }
+
+    /**
+     * Get recent trades list (newest first)
+     * 获取最近成交列表 (最新的在前)
+     */
+    public synchronized List<Trade> getRecentTrades() {
+        return new ArrayList<>(recentTrades);
+    }
+
+    /**
+     * Get recent trades with limit
+     * 获取指定数量的最近成交记录
+     */
+    public synchronized List<Trade> getRecentTrades(int limit) {
+        if (limit >= recentTrades.size()) {
+            return new ArrayList<>(recentTrades);
+        }
+        return recentTrades.stream().limit(limit).collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
     }
 }

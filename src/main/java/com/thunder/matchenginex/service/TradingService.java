@@ -8,6 +8,7 @@ import com.thunder.matchenginex.enums.OrderType;
 import com.thunder.matchenginex.event.OrderEventProducer;
 import com.thunder.matchenginex.model.Command;
 import com.thunder.matchenginex.model.Order;
+import com.thunder.matchenginex.model.Trade;
 import com.thunder.matchenginex.orderbook.OrderBook;
 import com.thunder.matchenginex.orderbook.OrderBookManager;
 import com.thunder.matchenginex.service.AccountService;
@@ -382,6 +383,24 @@ public class TradingService {
         }
 
         return activeSymbols;
+    }
+
+    /**
+     * Get recent trades for a symbol
+     * 获取指定交易对的最近成交记录
+     */
+    public List<Trade> getRecentTrades(String symbol) {
+        OrderBook orderBook = orderBookManager.getOrderBook(symbol);
+        return orderBook.getRecentTrades();
+    }
+
+    /**
+     * Get recent trades for a symbol with limit
+     * 获取指定交易对的最近成交记录，限制数量
+     */
+    public List<Trade> getRecentTrades(String symbol, int limit) {
+        OrderBook orderBook = orderBookManager.getOrderBook(symbol);
+        return orderBook.getRecentTrades(limit);
     }
 
 }

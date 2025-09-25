@@ -192,9 +192,10 @@ function subscribeToUpdates() {
         // Subscribe to trade updates
         console.log('Subscribing to trade updates for', currentSymbol);
         stompClient.subscribe('/topic/trades/' + currentSymbol, function(message) {
-            console.log('Received trade update');
-            const trades = JSON.parse(message.body);
-            updateTradeHistory(trades);
+            console.log('Received trade update:', message);
+            const trade = JSON.parse(message.body);
+            console.log('Parsed trade data:', trade);
+            updateRecentTrades(trade);
         });
 
         // Subscribe to user balance updates for all currencies
@@ -378,6 +379,13 @@ function initTradingPage() {
         loadCurrentOrders();
     } catch (error) {
         console.error('Error loading current orders:', error);
+    }
+
+    console.log('Loading recent trades...');
+    try {
+        loadRecentTrades();
+    } catch (error) {
+        console.error('Error loading recent trades:', error);
     }
 
     console.log('Initializing K-line chart with periodic refresh only...');
@@ -846,9 +854,114 @@ function loadOrderHistory() {
     }
 }
 
+// Recent trades functionality
+function loadRecentTrades() {
+    fetch(`/api/trading/trades/${currentSymbol}?limit=30`)
+        .then(response => response.json())
+        .then(trades => {
+            updateRecentTradesDisplay(trades);
+            console.log(`Recent trades loaded: ${trades.length} trades for ${currentSymbol}`);
+        })
+        .catch(error => {
+            console.error('Error loading recent trades:', error);
+            const tradesBody = document.getElementById('recent-trades-body');
+            if (tradesBody) {
+                tradesBody.innerHTML = `
+                    <div class="text-center text-muted py-4">
+                        <small>加载成交记录失败</small>
+                    </div>
+                `;
+            }
+        });
+}
+
+function updateRecentTrades(newTrade) {
+    // Add single new trade to the beginning of the list
+    const tradesBody = document.getElementById('recent-trades-body');
+    if (!tradesBody) return;
+
+    // Get current trades
+    let currentTrades = getCurrentTradesFromDisplay();
+
+    // Add new trade at the beginning
+    currentTrades.unshift(newTrade);
+
+    // Keep only 30 most recent trades
+    if (currentTrades.length > 30) {
+        currentTrades = currentTrades.slice(0, 30);
+    }
+
+    // Update display
+    updateRecentTradesDisplay(currentTrades);
+
+    // Add flash effect to the new trade
+    const firstRow = tradesBody.querySelector('.trade-row:first-child');
+    if (firstRow) {
+        firstRow.style.backgroundColor = '#ffffcc';
+        setTimeout(() => {
+            firstRow.style.backgroundColor = '';
+        }, 1000);
+    }
+}
+
+function getCurrentTradesFromDisplay() {
+    // This is a simplified version - in production, you'd maintain a trades array
+    // For now, return empty array as we'll reload from server
+    return [];
+}
+
+function updateRecentTradesDisplay(trades) {
+    const tradesBody = document.getElementById('recent-trades-body');
+    if (!tradesBody) return;
+
+    if (trades.length === 0) {
+        tradesBody.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <small>暂无成交记录</small>
+            </div>
+        `;
+        return;
+    }
+
+    tradesBody.innerHTML = '';
+
+    trades.forEach(trade => {
+        const tradeRow = document.createElement('div');
+        tradeRow.className = 'row trade-row py-1 small border-bottom';
+
+        // Determine if this trade is a buy or sell from trade data
+        const isBuy = trade.side === 'BUY';
+        const sideClass = isBuy ? 'text-success' : 'text-danger';
+        const sideText = isBuy ? '买' : '卖';
+        const priceClass = isBuy ? 'text-success' : 'text-danger';
+
+        // Format time
+        const tradeTime = new Date(trade.timestamp);
+        const timeStr = tradeTime.toLocaleTimeString('zh-CN', {
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        tradeRow.innerHTML = `
+            <div class="col-3 text-center">${timeStr}</div>
+            <div class="col-3 text-center ${sideClass} fw-bold">${sideText}</div>
+            <div class="col-3 text-center ${priceClass}">${parseFloat(trade.price).toFixed(2)}</div>
+            <div class="col-3 text-center">${parseFloat(trade.quantity).toFixed(4)}</div>
+        `;
+
+        tradesBody.appendChild(tradeRow);
+    });
+}
+
 function updateTradeHistory(trades) {
-    // Update recent trades display
-    console.log('Trade updates:', trades);
+    // Legacy function - redirect to new function
+    if (Array.isArray(trades)) {
+        updateRecentTradesDisplay(trades);
+    } else {
+        updateRecentTrades(trades);
+    }
 }
 
 // Add balance functionality

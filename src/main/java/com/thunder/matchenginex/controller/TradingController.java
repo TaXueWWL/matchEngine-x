@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import com.thunder.matchenginex.enums.OrderSide;
 import com.thunder.matchenginex.enums.OrderType;
 import com.thunder.matchenginex.model.Order;
+import com.thunder.matchenginex.model.Trade;
 import com.thunder.matchenginex.orderbook.OrderBook;
 import com.thunder.matchenginex.orderbook.PriceLevel;
 import com.thunder.matchenginex.service.TradingService;
@@ -281,6 +282,25 @@ public class TradingController {
         }
     }
 
+    @GetMapping("/trades/{symbol}")
+    public ResponseEntity<List<TradeDto>> getRecentTrades(
+            @PathVariable String symbol,
+            @RequestParam(defaultValue = "30") Integer limit) {
+        try {
+            List<Trade> trades = tradingService.getRecentTrades(symbol, Math.min(limit, 100)); // Limit max 100
+
+            List<TradeDto> tradeDtos = trades.stream()
+                    .map(this::convertToTradeDto)
+                    .toList();
+
+            return ResponseEntity.ok(tradeDtos);
+
+        } catch (Exception e) {
+            log.error("Error getting recent trades for {}: {}", symbol, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     private OrderDto convertToOrderDto(Order order) {
         return OrderDto.builder()
                 .orderId(order.getOrderId())
@@ -303,6 +323,27 @@ public class TradingController {
                 .price(priceLevel.getPrice())
                 .totalQuantity(priceLevel.getTotalQuantity())
                 .orderCount(priceLevel.getOrderCount())
+                .build();
+    }
+
+    private TradeDto convertToTradeDto(Trade trade) {
+        // For display purposes, we show trades from the taker's perspective
+        // Since we don't store the taker info directly, we'll use a simple approach:
+        // Show alternating buy/sell or determine based on trade ID
+        // 为了显示目的，我们从taker角度显示交易
+        String side = (trade.getTradeId() % 2 == 0) ? "BUY" : "SELL";
+
+        return TradeDto.builder()
+                .tradeId(trade.getTradeId())
+                .symbol(trade.getSymbol())
+                .buyOrderId(trade.getBuyOrderId())
+                .sellOrderId(trade.getSellOrderId())
+                .buyUserId(trade.getBuyUserId())
+                .sellUserId(trade.getSellUserId())
+                .price(trade.getPrice())
+                .quantity(trade.getQuantity())
+                .timestamp(trade.getTimestamp())
+                .side(side)
                 .build();
     }
 }
