@@ -11,6 +11,10 @@ let klineChart = null;
 let currentOrdersRefreshInterval = null;
 let isCurrentOrdersRefreshEnabled = true;
 
+// Recent trades refresh variables - 成交记录刷新变量
+let recentTradesRefreshInterval = null;
+let isTradesRefreshEnabled = true;
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOMContentLoaded fired, initializing app...');
@@ -448,6 +452,7 @@ function initTradingPage() {
 
     // Start auto-refresh on page load - 页面加载时启动自动刷新
     startCurrentOrdersAutoRefresh();
+    startTradesAutoRefresh();
 }
 
 function loadOrderBook() {
@@ -484,7 +489,7 @@ function updateOrderBook(orderBook) {
         const reversedSellLevels = [...sellLevels].reverse();
         let cumulativeSellQuantity = 0;
 
-        reversedSellLevels.slice(0, 8).forEach(level => {
+        reversedSellLevels.slice(0, 10).forEach(level => {
             const price = parseFloat(level.price);
             const quantity = parseFloat(level.totalQuantity || level.quantity);
             cumulativeSellQuantity += quantity;
@@ -510,7 +515,7 @@ function updateOrderBook(orderBook) {
         let cumulativeBuyQuantity = 0;
         const maxQuantity = Math.max(...buyLevels.map(l => parseFloat(l.totalQuantity || l.quantity)));
 
-        buyLevels.slice(0, 8).forEach(level => {
+        buyLevels.slice(0, 10).forEach(level => {
             const price = parseFloat(level.price);
             const quantity = parseFloat(level.totalQuantity || level.quantity);
             cumulativeBuyQuantity += quantity;
@@ -856,7 +861,7 @@ function loadOrderHistory() {
 
 // Recent trades functionality
 function loadRecentTrades() {
-    fetch(`/api/trading/trades/${currentSymbol}?limit=30`)
+    return fetch(`/api/trading/trades/${currentSymbol}?limit=30`)
         .then(response => response.json())
         .then(trades => {
             updateRecentTradesDisplay(trades);
@@ -925,34 +930,65 @@ function updateRecentTradesDisplay(trades) {
 
     tradesBody.innerHTML = '';
 
-    trades.forEach(trade => {
+    // 每行显示两笔交易（左右各一笔），最多15行
+    const maxRows = 15;
+    const actualRows = Math.min(maxRows, Math.ceil(trades.length / 2));
+
+    for (let row = 0; row < actualRows; row++) {
+        const leftIndex = row * 2;
+        const rightIndex = row * 2 + 1;
+
+        const leftTrade = trades[leftIndex];
+        const rightTrade = rightIndex < trades.length ? trades[rightIndex] : null;
+
         const tradeRow = document.createElement('div');
-        tradeRow.className = 'row trade-row py-1 small border-bottom';
+        tradeRow.className = 'row trade-row py-1 small border-bottom m-0';
 
-        // Determine if this trade is a buy or sell from trade data
-        const isBuy = trade.side === 'BUY';
-        const sideClass = isBuy ? 'text-success' : 'text-danger';
-        const sideText = isBuy ? '买' : '卖';
-        const priceClass = isBuy ? 'text-success' : 'text-danger';
+        // 左列交易
+        const leftContent = leftTrade ? formatTradeCell(leftTrade) : '<div class="col-3"></div><div class="col-3"></div><div class="col-3"></div><div class="col-3"></div>';
 
-        // Format time
-        const tradeTime = new Date(trade.timestamp);
-        const timeStr = tradeTime.toLocaleTimeString('zh-CN', {
-            hour12: false,
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-        });
+        // 右列交易
+        const rightContent = rightTrade ? formatTradeCell(rightTrade) : '<div class="col-3"></div><div class="col-3"></div><div class="col-3"></div><div class="col-3"></div>';
 
         tradeRow.innerHTML = `
-            <div class="col-3 text-center">${timeStr}</div>
-            <div class="col-3 text-center ${sideClass} fw-bold">${sideText}</div>
-            <div class="col-3 text-center ${priceClass}">${parseFloat(trade.price).toFixed(2)}</div>
-            <div class="col-3 text-center">${parseFloat(trade.quantity).toFixed(4)}</div>
+            <div class="col-6 border-end">
+                <div class="row">
+                    ${leftContent}
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="row">
+                    ${rightContent}
+                </div>
+            </div>
         `;
 
         tradesBody.appendChild(tradeRow);
+    }
+}
+
+function formatTradeCell(trade) {
+    // Determine if this trade is a buy or sell from trade data
+    const isBuy = trade.side === 'BUY';
+    const sideClass = isBuy ? 'text-success' : 'text-danger';
+    const sideText = isBuy ? '买' : '卖';
+    const priceClass = isBuy ? 'text-success' : 'text-danger';
+
+    // Format time
+    const tradeTime = new Date(trade.timestamp);
+    const timeStr = tradeTime.toLocaleTimeString('zh-CN', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
     });
+
+    return `
+        <div class="col-3 text-center">${timeStr}</div>
+        <div class="col-3 text-center ${sideClass} fw-bold">${sideText}</div>
+        <div class="col-3 text-center ${priceClass}">${parseFloat(trade.price).toFixed(2)}</div>
+        <div class="col-3 text-center">${parseFloat(trade.quantity).toFixed(4)}</div>
+    `;
 }
 
 function updateTradeHistory(trades) {
@@ -1656,8 +1692,105 @@ function updateRefreshInterval() {
     console.log(`🔄 K-line refresh interval updated to ${intervalSeconds} seconds`);
 }
 
+/**
+ * Start automatic refresh of recent trades - 开始自动刷新成交记录
+ */
+function startTradesAutoRefresh() {
+    // Clear existing interval if any - 清除现有的定时器
+    if (recentTradesRefreshInterval) {
+        clearInterval(recentTradesRefreshInterval);
+    }
+
+    if (!isTradesRefreshEnabled) {
+        console.log('⏸️ Recent trades auto-refresh is disabled');
+        return;
+    }
+
+    // Set up new interval - 设置新的定时器
+    recentTradesRefreshInterval = setInterval(() => {
+        console.log('🔄 Auto-refreshing recent trades...');
+        loadRecentTrades();
+    }, 2000); // 2秒刷新一次
+
+    console.log('⏰ Recent trades auto-refresh started (every 2 seconds)');
+}
+
+/**
+ * Stop automatic refresh of recent trades - 停止自动刷新成交记录
+ */
+function stopTradesAutoRefresh() {
+    if (recentTradesRefreshInterval) {
+        clearInterval(recentTradesRefreshInterval);
+        recentTradesRefreshInterval = null;
+        console.log('⏹️ Recent trades auto-refresh stopped');
+    }
+}
+
+/**
+ * Toggle automatic refresh of recent trades - 切换成交记录自动刷新状态
+ */
+function toggleTradesAutoRefresh() {
+    isTradesRefreshEnabled = !isTradesRefreshEnabled;
+
+    if (isTradesRefreshEnabled) {
+        startTradesAutoRefresh();
+    } else {
+        stopTradesAutoRefresh();
+    }
+
+    // Update UI indicator
+    updateTradesAutoRefreshIndicator();
+
+    console.log(`🔄 Recent trades auto-refresh ${isTradesRefreshEnabled ? 'enabled' : 'disabled'}`);
+}
+
+/**
+ * Manual refresh recent trades - 手动刷新成交记录
+ */
+function refreshRecentTrades() {
+    console.log('🔄 Manual recent trades refresh triggered');
+
+    const refreshIcon = document.getElementById('trades-refresh-icon');
+    if (refreshIcon) {
+        refreshIcon.classList.add('fa-spin');
+    }
+
+    loadRecentTrades().finally(() => {
+        // Remove spin animation
+        if (refreshIcon) {
+            refreshIcon.classList.remove('fa-spin');
+        }
+    });
+}
+
+/**
+ * Update auto-refresh indicator in UI - 更新UI中的成交记录自动刷新指示器
+ */
+function updateTradesAutoRefreshIndicator() {
+    const toggleBtn = document.getElementById('trades-auto-refresh-toggle');
+
+    if (toggleBtn) {
+        const icon = toggleBtn.querySelector('i');
+        if (icon) {
+            icon.className = isTradesRefreshEnabled ? 'fas fa-pause' : 'fas fa-play';
+        }
+
+        if (isTradesRefreshEnabled) {
+            toggleBtn.classList.remove('btn-outline-danger');
+            toggleBtn.classList.add('btn-outline-success', 'active');
+            toggleBtn.title = '自动刷新已启用 - 点击禁用';
+        } else {
+            toggleBtn.classList.remove('btn-outline-success', 'active');
+            toggleBtn.classList.add('btn-outline-danger');
+            toggleBtn.title = '自动刷新已禁用 - 点击启用';
+        }
+    }
+}
+
 // Make refresh functions globally available
 window.manualRefreshKline = manualRefreshKline;
 window.toggleAutoRefresh = toggleAutoRefresh;
 window.setKlineRefreshInterval = setKlineRefreshInterval;
 window.updateRefreshInterval = updateRefreshInterval;
+window.refreshRecentTrades = refreshRecentTrades;
+window.toggleTradesAutoRefresh = toggleTradesAutoRefresh;

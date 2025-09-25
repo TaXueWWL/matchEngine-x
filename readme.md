@@ -663,3 +663,4 @@ klineChart.addCandlestickSeries is not a function 错误表明：
 - √ 1分钟k线一刷新就不展示了
 - √ 当前订单推送不及时，有bug
 
+

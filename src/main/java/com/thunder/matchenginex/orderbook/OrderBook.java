@@ -52,6 +52,9 @@ public class OrderBook {
 
         log.debug("Added order {} to {} side at price {}",
                 order.getOrderId(), order.getSide(), order.getPrice());
+
+        // Print order book when new order is added - 有新订单进入时打印订单簿
+        printOrderBookOnNewOrder(order);
     }
 
     public boolean removeOrder(long orderId) {
@@ -296,5 +299,89 @@ public class OrderBook {
             return new ArrayList<>(recentTrades);
         }
         return recentTrades.stream().limit(limit).collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+    }
+
+    /**
+     * Print order book when new order is added - 有新订单进入时打印订单簿
+     */
+    private void printOrderBookOnNewOrder(Order newOrder) {
+        try {
+            // 获取卖单（价格从低到高）- 最多10层
+            List<PriceLevel> sellLevels = getSellLevels(10);
+
+            // 获取买单（价格从高到低）- 最多10层
+            List<PriceLevel> buyLevels = getBuyLevels(10);
+
+            log.info("📊 ==================== 新订单进入订单簿: {} ====================", symbol);
+            log.info("🆕 新订单: OrderId={}, Side={}, 价格={}, 数量={}",
+                    newOrder.getOrderId(),
+                    newOrder.getSide(),
+                    formatPrice(newOrder.getPrice()),
+                    formatQuantity(newOrder.getQuantity()));
+
+            // 打印卖单 - 从卖10到卖1（价格从高到低显示，但实际是从低价到高价的倒序）
+            if (sellLevels.isEmpty()) {
+                log.info("📈 无卖单");
+            } else {
+                // 倒序打印，让最低价格在最下面（接近当前价格）
+                for (int i = sellLevels.size() - 1; i >= 0; i--) {
+                    PriceLevel level = sellLevels.get(i);
+                    log.info("卖{} - 价格: {} USDT, 数量: {} BTC, 订单数: {}",
+                        (sellLevels.size() - i),
+                        formatPrice(level.getPrice()),
+                        formatQuantity(level.getTotalQuantity()),
+                        level.getOrderCount());
+                }
+            }
+
+            log.info("💰 ----------------------------------------");
+
+            // 打印买单 - 从买1到买10（价格从高到低）
+            if (buyLevels.isEmpty()) {
+                log.info("📉 无买单");
+            } else {
+                for (int i = 0; i < buyLevels.size(); i++) {
+                    PriceLevel level = buyLevels.get(i);
+                    log.info("买{} - 价格: {} USDT, 数量: {} BTC, 订单数: {}",
+                        (i + 1),
+                        formatPrice(level.getPrice()),
+                        formatQuantity(level.getTotalQuantity()),
+                        level.getOrderCount());
+                }
+            }
+
+            // 打印价差信息
+            BigDecimal midPrice = getMidPrice();
+            BigDecimal spread = getSpread();
+            if (midPrice != null && spread != null) {
+                log.info("💰 中间价: {} USDT, 价差: {} USDT", formatPrice(midPrice), formatPrice(spread));
+            }
+
+            log.info("📊 订单总数: {}", getTotalOrders());
+            log.info("📊 ========================================================");
+
+        } catch (Exception e) {
+            log.error("❌ Error printing order book on new order {}: {}", newOrder.getOrderId(), e.getMessage());
+        }
+    }
+
+    /**
+     * 格式化价格显示
+     */
+    private String formatPrice(BigDecimal price) {
+        if (price == null) {
+            return "N/A";
+        }
+        return String.format("%.2f", price);
+    }
+
+    /**
+     * 格式化数量显示
+     */
+    private String formatQuantity(BigDecimal quantity) {
+        if (quantity == null) {
+            return "N/A";
+        }
+        return String.format("%.6f", quantity);
     }
 }

@@ -308,8 +308,8 @@ body.dark-theme .navbar .nav-link.active {
 }
 
 .orderbook-levels {
-    max-height: 200px;
-    overflow-y: hidden;
+    max-height: 300px;
+    overflow-y: auto;
     background-color: #181A20;
 }
 

@@ -141,8 +141,8 @@ public class WebSocketPushDisruptorService {
             ringBuffer.publish(sequence);
         }
 
-        log.debug("📤 Published trade update to Disruptor: tradeId={}, sequence={}",
-            trade.getTradeId(), sequence);
+//        log.debug("📤 Published trade update to Disruptor: tradeId={}, sequence={}",
+//            trade.getTradeId(), sequence);
     }
 
     /**
@@ -164,8 +164,8 @@ public class WebSocketPushDisruptorService {
             ringBuffer.publish(sequence);
         }
 
-        log.debug("📤 Published order book update to Disruptor: symbol={}, sequence={}",
-            symbol, sequence);
+//        log.debug("📤 Published order book update to Disruptor: symbol={}, sequence={}",
+//            symbol, sequence);
     }
 
     /**

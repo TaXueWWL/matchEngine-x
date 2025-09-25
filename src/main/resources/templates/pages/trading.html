@@ -251,24 +251,53 @@
                         <i class="fas fa-exchange-alt me-2"></i>
                         最近成交
                     </h6>
-                    <small class="text-muted">最新30笔</small>
+                    <div class="d-flex align-items-center gap-2">
+                        <small class="text-muted">最新30笔</small>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-secondary" onclick="refreshRecentTrades()" title="手动刷新">
+                                <i class="fas fa-sync-alt" id="trades-refresh-icon"></i>
+                            </button>
+                            <button class="btn btn-outline-success active" onclick="toggleTradesAutoRefresh()"
+                                    id="trades-auto-refresh-toggle" title="自动刷新">
+                                <i class="fas fa-play"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body p-0">
-                    <div class="recent-trades-container" style="height: 300px; overflow-y: auto;">
-                        <div class="recent-trades-header sticky-top bg-light">
-                            <div class="row text-center small py-2 border-bottom text-muted fw-bold">
-                                <div class="col-3">时间</div>
-                                <div class="col-3">方向</div>
-                                <div class="col-3">价格(USDT)</div>
-                                <div class="col-3">数量(BTC)</div>
+                    <div class="recent-trades-container" style="height: 300px;">
+                        <!-- 表头 -->
+                        <div class="recent-trades-header sticky-top bg-light border-bottom">
+                            <div class="row text-center small py-2 text-muted fw-bold m-0">
+                                <!-- 左列表头 -->
+                                <div class="col-6 border-end">
+                                    <div class="row">
+                                        <div class="col-3">时间</div>
+                                        <div class="col-3">方向</div>
+                                        <div class="col-3">价格(USDT)</div>
+                                        <div class="col-3">数量(BTC)</div>
+                                    </div>
+                                </div>
+                                <!-- 右列表头 -->
+                                <div class="col-6">
+                                    <div class="row">
+                                        <div class="col-3">时间</div>
+                                        <div class="col-3">方向</div>
+                                        <div class="col-3">价格(USDT)</div>
+                                        <div class="col-3">数量(BTC)</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div id="recent-trades-body" class="recent-trades-body">
-                            <div class="text-center text-muted py-4">
-                                <div class="spinner-border spinner-border-sm" role="status">
-                                    <span class="visually-hidden">Loading...</span>
+                        <!-- 数据内容 -->
+                        <div style="height: 250px; overflow-y: auto;">
+                            <div id="recent-trades-body" class="recent-trades-body">
+                                <div class="text-center text-muted py-4">
+                                    <div class="spinner-border spinner-border-sm" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <small class="d-block mt-1">加载成交记录...</small>
                                 </div>
-                                <small class="d-block mt-1">加载成交记录...</small>
                             </div>
                         </div>
                     </div>

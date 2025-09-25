@@ -11,7 +11,7 @@ spring:
 
 logging:
   level:
-    com.thunder.matchenginex: DEBUG
+    com.thunder.matchenginex: INFO
     com.lmax.disruptor: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
