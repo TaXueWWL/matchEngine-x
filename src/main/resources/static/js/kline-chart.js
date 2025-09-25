@@ -18,6 +18,9 @@ class KlineChart {
         this.refreshInterval = 3000; // 3秒刷新一次
         this.isRefreshing = false;
         this.autoRefreshEnabled = true;
+        this.consecutiveErrors = 0; // 连续错误计数
+        this.maxConsecutiveErrors = 5; // 最大连续错误次数
+        this.errorBackoffMs = 5000; // 错误退避时间
 
         // Chart configuration - Dark theme chart configuration
         // 延迟获取容器尺寸，避免在DOM未准备好时访问
@@ -67,7 +70,79 @@ class KlineChart {
             },
         };
 
+        // 设置全局错误处理器
+        this.setupErrorHandlers();
+
         this.init();
+    }
+
+    /**
+     * Setup global error handlers - 设置全局错误处理器
+     */
+    setupErrorHandlers() {
+        // 捕获未处理的Promise拒绝
+        this.unhandledRejectionHandler = (event) => {
+            const message = event.reason?.message || '';
+            if (message.includes('Value is null') ||
+                message.includes('lightweight') ||
+                (event.reason?.stack && event.reason.stack.includes('lightweight-charts'))) {
+                console.error('❌ Unhandled LightweightCharts promise rejection:', event.reason);
+                event.preventDefault(); // 阻止控制台显示错误
+                this.handleChartError(event.reason);
+            }
+        };
+
+        // 捕获未处理的错误
+        this.errorHandler = (event) => {
+            const message = event.error?.message || '';
+            const stack = event.error?.stack || '';
+            if (message.includes('Value is null') ||
+                message.includes('lightweight') ||
+                stack.includes('lightweight-charts')) {
+                console.error('❌ Unhandled LightweightCharts error:', event.error);
+                event.preventDefault(); // 阻止控制台显示错误
+                this.handleChartError(event.error);
+            }
+        };
+
+        window.addEventListener('unhandledrejection', this.unhandledRejectionHandler);
+        window.addEventListener('error', this.errorHandler);
+    }
+
+    /**
+     * Handle chart-related errors - 处理图表相关错误
+     */
+    handleChartError(error) {
+        console.error('🔧 Handling chart error:', error);
+
+        this.consecutiveErrors++;
+
+        // 如果错误过多，尝试重建图表
+        if (this.consecutiveErrors >= 3) {
+            console.warn('⚠️ Multiple chart errors detected, attempting recovery...');
+            setTimeout(() => {
+                try {
+                    this.recreateChart();
+                } catch (recoveryError) {
+                    console.error('❌ Chart recovery failed:', recoveryError);
+                    this.showError('图表出现错误，请刷新页面');
+                }
+            }, 1000);
+        }
+    }
+
+    /**
+     * Cleanup error handlers - 清理错误处理器
+     */
+    cleanupErrorHandlers() {
+        if (this.unhandledRejectionHandler) {
+            window.removeEventListener('unhandledrejection', this.unhandledRejectionHandler);
+            this.unhandledRejectionHandler = null;
+        }
+        if (this.errorHandler) {
+            window.removeEventListener('error', this.errorHandler);
+            this.errorHandler = null;
+        }
     }
 
     /**
@@ -93,9 +168,33 @@ class KlineChart {
                 optionsValid: this.chartOptions && typeof this.chartOptions === 'object'
             });
 
-            // 验证chartOptions中的关键字段
+            // 验证chartOptions中的关键字段和null值
             if (!this.chartOptions || typeof this.chartOptions !== 'object') {
                 throw new Error('Invalid chart options');
+            }
+
+            // 深度验证chartOptions，确保没有null值
+            console.log('🔍 Deep validation of chart options:');
+            const validateObject = (obj, path = '') => {
+                for (const [key, value] of Object.entries(obj)) {
+                    const currentPath = path ? `${path}.${key}` : key;
+                    if (value === null) {
+                        console.error(`❌ Null value found in chartOptions at ${currentPath}`);
+                        throw new Error(`Null value in chart options at ${currentPath}`);
+                    }
+                    if (value !== undefined && typeof value === 'object' && !Array.isArray(value)) {
+                        validateObject(value, currentPath);
+                    }
+                    console.log(`✅ ${currentPath}: ${typeof value === 'object' ? 'object' : value}`);
+                }
+            };
+
+            try {
+                validateObject(this.chartOptions);
+                console.log('✅ Chart options validation passed');
+            } catch (validationError) {
+                console.error('❌ Chart options validation failed:', validationError);
+                throw validationError;
             }
 
             if (!this.container || !this.container.tagName) {
@@ -129,6 +228,7 @@ class KlineChart {
 
             // Try different method names for different versions
             try {
+                // 确保系列配置没有null值
                 const seriesOptions = {
                     upColor: '#00C851',       // Green for up candles (涨)
                     downColor: '#FF4444',     // Red for down candles (跌)
@@ -136,6 +236,16 @@ class KlineChart {
                     wickUpColor: '#00C851',   // Green wicks for up candles
                     wickDownColor: '#FF4444', // Red wicks for down candles
                 };
+
+                // 验证系列配置
+                console.log('🔧 Validating series options before creation:');
+                for (const [key, value] of Object.entries(seriesOptions)) {
+                    if (value === null || value === undefined) {
+                        console.error(`❌ Null/undefined value found in seriesOptions.${key}:`, value);
+                        throw new Error(`Invalid series option: ${key} is ${value}`);
+                    }
+                    console.log(`✅ ${key}: ${value} (${typeof value})`);
+                }
 
                 console.log('🔧 Adding candlestick series with options:', seriesOptions);
 
@@ -235,7 +345,7 @@ class KlineChart {
                         }
 
                         console.log(`📊 Setting ${validData.length} validated candles to chart (filtered from ${candleData.length})`);
-                        this.candlestickSeries.setData(validData);
+                        this.safeSetData(validData);
 
                         // 更新最后已知价格
                         const lastCandle = validData[validData.length - 1];
@@ -314,7 +424,7 @@ class KlineChart {
 
             if (candleData && this.candlestickSeries && this.validateCandleData(candleData)) {
                 try {
-                    this.candlestickSeries.update(candleData);
+                    this.safeUpdate(candleData);
 
                     // 更新最后已知价格（用于心跳数据）
                     if (candleData.close > 0) {
@@ -527,7 +637,7 @@ class KlineChart {
 
         // Clear chart data - 清空图表数据
         if (this.candlestickSeries) {
-            this.candlestickSeries.setData([]);
+            this.safeSetData([]);
         }
 
         // Load new data - 加载新数据
@@ -549,7 +659,7 @@ class KlineChart {
 
         // Clear chart data - 清空图表数据
         if (this.candlestickSeries) {
-            this.candlestickSeries.setData([]);
+            this.safeSetData([]);
         }
 
         // Load new data - 加载新数据
@@ -641,11 +751,29 @@ class KlineChart {
                     return;
                 }
 
-                this.refreshKlineData().catch(error => {
+                // 检查连续错误次数，如果过多则暂停一段时间
+                if (this.consecutiveErrors >= this.maxConsecutiveErrors) {
+                    console.warn(`⚠️ Too many consecutive errors (${this.consecutiveErrors}), backing off for ${this.errorBackoffMs}ms`);
+                    this.stopAutoRefresh();
+                    setTimeout(() => {
+                        console.log('🔄 Resuming auto-refresh after error backoff');
+                        this.consecutiveErrors = 0; // 重置错误计数
+                        this.startAutoRefresh();
+                    }, this.errorBackoffMs);
+                    return;
+                }
+
+                this.refreshKlineData().then(() => {
+                    // 成功则重置错误计数
+                    this.consecutiveErrors = 0;
+                }).catch(error => {
                     console.error('❌ Auto-refresh error:', error);
+                    this.consecutiveErrors++;
+                    console.warn(`⚠️ Consecutive errors: ${this.consecutiveErrors}/${this.maxConsecutiveErrors}`);
                 });
             } catch (error) {
                 console.error('❌ Auto-refresh timer error:', error);
+                this.consecutiveErrors++;
             }
         }, this.refreshInterval);
 
@@ -743,7 +871,7 @@ class KlineChart {
                     if (latestCandle && this.validateCandleData(latestCandle)) {
                         try {
                             console.log(`📊 Updating latest candle:`, latestCandle);
-                            this.candlestickSeries.update(latestCandle);
+                            this.safeUpdate(latestCandle);
 
                             // 更新最后已知价格
                             if (latestCandle.close > 0) {
@@ -759,9 +887,9 @@ class KlineChart {
                             // 如果有多个数据点，添加之前的数据点
                             if (candleData.length > 1) {
                                 const prevCandle = candleData[candleData.length - 2];
-                                this.candlestickSeries.update(prevCandle);
+                                this.safeUpdate(prevCandle);
                             }
-                            this.candlestickSeries.update(latestCandle);
+                            this.safeUpdate(latestCandle);
                         }
                     }
                 }
@@ -807,6 +935,164 @@ class KlineChart {
         }
 
         return true;
+    }
+
+    /**
+     * Safe wrapper for setData method - setData方法的安全封装
+     */
+    safeSetData(data) {
+        try {
+            console.log('🛡️ Safe setData called with:', { dataType: typeof data, isArray: Array.isArray(data), length: data?.length });
+
+            // 健康检查
+            if (!this.checkChartHealth()) {
+                console.error('❌ Chart health check failed, cannot setData');
+                return false;
+            }
+
+            if (!Array.isArray(data)) {
+                console.error('❌ Cannot setData: data is not an array:', data);
+                return false;
+            }
+
+            // 额外验证每个数据点
+            const safeData = data.filter(item => {
+                if (!this.validateCandleData(item)) {
+                    console.warn('⚠️ Filtering out invalid candle in setData:', item);
+                    return false;
+                }
+                return true;
+            });
+
+            console.log(`🛡️ Calling setData with ${safeData.length} validated items (filtered from ${data.length})`);
+            this.candlestickSeries.setData(safeData);
+            return true;
+
+        } catch (error) {
+            console.error('❌ Error in safeSetData:', error);
+            console.error('❌ Data that caused error:', data);
+            return false;
+        }
+    }
+
+    /**
+     * Safe wrapper for update method - update方法的安全封装
+     */
+    safeUpdate(data) {
+        try {
+            console.log('🛡️ Safe update called with:', data);
+
+            // 健康检查
+            if (!this.checkChartHealth()) {
+                console.error('❌ Chart health check failed, cannot update');
+                return false;
+            }
+
+            if (!this.validateCandleData(data)) {
+                console.error('❌ Cannot update: invalid candle data:', data);
+                return false;
+            }
+
+            console.log('🛡️ Calling update with validated data');
+            this.candlestickSeries.update(data);
+            return true;
+
+        } catch (error) {
+            console.error('❌ Error in safeUpdate:', error);
+            console.error('❌ Data that caused error:', data);
+            return false;
+        }
+    }
+
+    /**
+     * Check chart health and attempt recovery if needed - 检查图表健康状态并尝试恢复
+     */
+    checkChartHealth() {
+        try {
+            if (!this.chart) {
+                console.warn('⚠️ Chart instance is null, attempting to recreate...');
+                this.recreateChart();
+                return false;
+            }
+
+            if (!this.candlestickSeries) {
+                console.warn('⚠️ Candlestick series is null, attempting to recreate...');
+                this.recreateSeries();
+                return false;
+            }
+
+            if (!this.container || !document.contains(this.container)) {
+                console.error('❌ Chart container is not in DOM anymore');
+                return false;
+            }
+
+            return true;
+        } catch (error) {
+            console.error('❌ Error in chart health check:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Recreate chart instance - 重新创建图表实例
+     */
+    recreateChart() {
+        try {
+            console.log('🔄 Recreating chart instance...');
+
+            // 清理现有图表
+            if (this.chart) {
+                try {
+                    this.chart.remove();
+                } catch (e) {
+                    console.warn('⚠️ Error removing old chart:', e);
+                }
+            }
+
+            // 重新初始化
+            this.chart = null;
+            this.candlestickSeries = null;
+
+            // 重新创建图表
+            this.init();
+
+        } catch (error) {
+            console.error('❌ Error recreating chart:', error);
+            this.showError('图表重建失败，请刷新页面');
+        }
+    }
+
+    /**
+     * Recreate candlestick series - 重新创建蜡烛图系列
+     */
+    recreateSeries() {
+        try {
+            console.log('🔄 Recreating candlestick series...');
+
+            if (!this.chart) {
+                console.error('❌ Cannot recreate series: chart is null');
+                return;
+            }
+
+            const seriesOptions = {
+                upColor: '#00C851',
+                downColor: '#FF4444',
+                borderVisible: false,
+                wickUpColor: '#00C851',
+                wickDownColor: '#FF4444',
+            };
+
+            if (typeof this.chart.addCandlestickSeries === 'function') {
+                this.candlestickSeries = this.chart.addCandlestickSeries(seriesOptions);
+            } else if (typeof this.chart.addSeries === 'function') {
+                this.candlestickSeries = this.chart.addSeries('candlestick', seriesOptions);
+            }
+
+            console.log('✅ Candlestick series recreated');
+
+        } catch (error) {
+            console.error('❌ Error recreating series:', error);
+        }
     }
 
     /**
@@ -942,10 +1228,18 @@ class KlineChart {
         // 移除页面可见性处理器
         this.removeVisibilityChangeHandler();
 
+        // 清理错误处理器
+        this.cleanupErrorHandlers();
+
         if (this.chart) {
-            this.chart.remove();
+            try {
+                this.chart.remove();
+            } catch (error) {
+                console.warn('⚠️ Error removing chart during destroy:', error);
+            }
             this.chart = null;
         }
+        this.candlestickSeries = null;
 
         console.log('K-line chart destroyed');
     }

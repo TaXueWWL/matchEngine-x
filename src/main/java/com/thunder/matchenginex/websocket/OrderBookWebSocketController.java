@@ -83,7 +83,7 @@ public class OrderBookWebSocketController {
                     OrderBookDto orderBookDto = convertToOrderBookDto(orderBook, symbol);
                     messagingTemplate.convertAndSend("/topic/orderbook/" + symbol, orderBookDto);
                     lastOrderBookHash.put(symbol, currentHash);
-                    log.debug("Pushed order book update for {}", symbol);
+//                    log.debug("Pushed order book update for {}", symbol);
                 }
 
                 // Push latest trade price if available and changed - 如果最新交易价格可用且发生变化则推送
