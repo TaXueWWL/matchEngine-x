@@ -12,12 +12,16 @@ import com.thunder.matchenginex.orderbook.PriceLevel;
 import com.thunder.matchenginex.service.AccountService;
 import com.thunder.matchenginex.util.CurrencyUtils;
 import com.thunder.matchenginex.websocket.OrderBookWebSocketController;
+import com.thunder.matchenginex.websocket.OrderWebSocketController;
 import com.thunder.matchenginex.service.KlineService;
+import com.thunder.matchenginex.disruptor.WebSocketPushDisruptorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -41,6 +45,10 @@ public class MatchingEngine {
 
     @Autowired
     @Lazy
+    private OrderWebSocketController orderWebSocketController;
+
+    @Autowired
+    @Lazy
     private AccountService accountService;
 
     @Autowired
@@ -50,6 +58,14 @@ public class MatchingEngine {
     @Autowired
     @Lazy
     private KlineService klineService;
+
+    @Autowired
+    @Qualifier("webSocketPushExecutor")
+    private ThreadPoolTaskExecutor webSocketPushExecutor;
+
+    @Autowired
+    @Lazy
+    private WebSocketPushDisruptorService disruptorService;
 
     public void placeOrder(Command command) {
         Order order = createOrderFromCommand(command);
@@ -83,6 +99,9 @@ public class MatchingEngine {
 
         // Immediately push order book update after order placement - 下单后立即推送订单簿更新
         pushOrderBookUpdateAsync(command.getSymbol());
+
+        // Push order update to user via Disruptor - 通过Disruptor推送订单更新给用户
+        pushOrderUpdateViaDisruptor(order);
     }
 
     public void cancelOrder(Command command) {
@@ -111,6 +130,9 @@ public class MatchingEngine {
 
             // Immediately push order book update after order cancellation - 取消订单后立即推送订单簿更新
             pushOrderBookUpdateAsync(command.getSymbol());
+
+            // Push order update to user via Disruptor - 通过Disruptor推送订单更新给用户
+            pushOrderUpdateViaDisruptor(order);
         } else {
             log.warn("Failed to remove order from order book: {}", command.getOrderId());
         }
@@ -152,6 +174,9 @@ public class MatchingEngine {
 
         // Immediately push order book update after order modification - 修改订单后立即推送订单簿更新
         pushOrderBookUpdateAsync(command.getSymbol());
+
+        // Push order update to user via Disruptor - 通过Disruptor推送订单更新给用户
+        pushOrderUpdateViaDisruptor(newOrder);
     }
 
     public void queryOrder(Command command) {
@@ -391,6 +416,9 @@ public class MatchingEngine {
 
             // Update K-line data - 更新K线数据
             klineService.processTrade(trade);
+
+            // Push trade updates via Disruptor - 通过Disruptor推送交易更新
+            pushTradeUpdateViaDisruptor(trade);
         }
     }
 
@@ -445,24 +473,128 @@ public class MatchingEngine {
     }
 
     /**
-     * Asynchronously push order book updates via WebSocket - 通过WebSocket异步推送订单簿更新
+     * Push order book updates via Disruptor for ultra-low latency - 通过Disruptor推送订单簿更新，实现超低延迟
      * This ensures real-time updates without blocking the matching engine - 确保实时更新而不阻塞撮合引擎
      */
     private void pushOrderBookUpdateAsync(String symbol) {
-        if (webSocketController != null) {
+        if (disruptorService != null) {
             try {
-                // Use a separate thread to avoid blocking the matching engine - 使用单独线程避免阻塞撮合引擎
-                CompletableFuture.runAsync(() -> {
-                    webSocketController.pushImmediateUpdate(symbol);
-                }).exceptionally(ex -> {
-                    log.error("Error pushing WebSocket update for symbol {}: {}", symbol, ex.getMessage());
-                    return null;
-                });
+                disruptorService.publishOrderBookUpdate(symbol);
+                log.debug("📤 Published order book update to Disruptor: symbol={}", symbol);
             } catch (Exception e) {
-                log.error("Error initiating WebSocket update for symbol {}: {}", symbol, e.getMessage());
+                log.error("❌ Error publishing order book update to Disruptor for symbol {}: {}", symbol, e.getMessage());
+                // Fallback to old method if Disruptor fails
+                fallbackToPushOrderBookUpdate(symbol);
             }
         } else {
-            log.debug("WebSocket controller not available for pushing updates");
+            log.debug("⚠️ Disruptor service not available, using fallback method");
+            fallbackToPushOrderBookUpdate(symbol);
         }
+    }
+
+    /**
+     * Push order updates via Disruptor for ultra-low latency - 通过Disruptor推送订单更新，实现超低延迟
+     * This ensures real-time order status updates without blocking the matching engine - 确保实时订单状态更新而不阻塞撮合引擎
+     */
+    private void pushOrderUpdateViaDisruptor(Order order) {
+        if (disruptorService != null) {
+            try {
+                disruptorService.publishOrderUpdate(order);
+                log.debug("📤 Published order update to Disruptor: orderId={}, userId={}",
+                    order.getOrderId(), order.getUserId());
+            } catch (Exception e) {
+                log.error("❌ Error publishing order update to Disruptor for orderId {}: {}", order.getOrderId(), e.getMessage());
+                // Fallback to old method if Disruptor fails
+                fallbackToPushOrderUpdate(order);
+            }
+        } else {
+            log.debug("⚠️ Disruptor service not available, using fallback method");
+            fallbackToPushOrderUpdate(order);
+        }
+    }
+
+    /**
+     * Push trade updates via Disruptor for ultra-low latency - 通过Disruptor推送交易更新，实现超低延迟
+     * This is called after each trade to notify users about their order status changes - 在每次交易后调用，通知用户订单状态变化
+     */
+    private void pushTradeUpdateViaDisruptor(Trade trade) {
+        if (disruptorService != null) {
+            try {
+                disruptorService.publishTradeUpdate(trade);
+                log.debug("📤 Published trade update to Disruptor: tradeId={}, buyUser={}, sellUser={}",
+                    trade.getTradeId(), trade.getBuyUserId(), trade.getSellUserId());
+            } catch (Exception e) {
+                log.error("❌ Error publishing trade update to Disruptor for trade {}: {}", trade.getTradeId(), e.getMessage());
+                // Fallback to old method if Disruptor fails
+                fallbackToPushTradeUpdate(trade);
+            }
+        } else {
+            log.debug("⚠️ Disruptor service not available, using fallback method");
+            fallbackToPushTradeUpdate(trade);
+        }
+    }
+
+    // Fallback methods using CompletableFuture when Disruptor is unavailable
+    // 当Disruptor不可用时使用CompletableFuture的备用方法
+
+    private void fallbackToPushOrderBookUpdate(String symbol) {
+        if (webSocketController != null) {
+            CompletableFuture.runAsync(() -> {
+                webSocketController.pushImmediateUpdate(symbol);
+            }, webSocketPushExecutor).exceptionally(ex -> {
+                log.error("Error in fallback order book push for symbol {}: {}", symbol, ex.getMessage());
+                return null;
+            });
+        }
+    }
+
+    private void fallbackToPushOrderUpdate(Order order) {
+        if (orderWebSocketController != null) {
+            CompletableFuture.runAsync(() -> {
+                orderWebSocketController.pushOrderUpdateToRelevantUsers(order);
+            }, webSocketPushExecutor).exceptionally(ex -> {
+                log.error("Error in fallback order push for orderId {}: {}", order.getOrderId(), ex.getMessage());
+                return null;
+            });
+        }
+    }
+
+    private void fallbackToPushTradeUpdate(Trade trade) {
+        if (orderWebSocketController != null) {
+            CompletableFuture.runAsync(() -> {
+                orderWebSocketController.pushCurrentOrdersUpdate(trade.getBuyUserId());
+                orderWebSocketController.pushCurrentOrdersUpdate(trade.getSellUserId());
+            }, webSocketPushExecutor).exceptionally(ex -> {
+                log.error("Error in fallback trade push for tradeId {}: {}", trade.getTradeId(), ex.getMessage());
+                return null;
+            });
+        }
+    }
+
+    /**
+     * Get performance statistics for monitoring - 获取性能统计信息用于监控
+     */
+    public String getPerformanceStats() {
+        StringBuilder stats = new StringBuilder();
+
+        // Disruptor stats
+        if (disruptorService != null) {
+            stats.append("Disruptor: ").append(disruptorService.getDisruptorStats()).append("; ");
+        } else {
+            stats.append("Disruptor: Not available; ");
+        }
+
+        // Thread pool stats
+        if (webSocketPushExecutor != null) {
+            stats.append(String.format("ThreadPool - Active: %d, Pool: %d, Queue: %d, Completed: %d",
+                webSocketPushExecutor.getActiveCount(),
+                webSocketPushExecutor.getPoolSize(),
+                webSocketPushExecutor.getThreadPoolExecutor().getQueue().size(),
+                webSocketPushExecutor.getThreadPoolExecutor().getCompletedTaskCount()));
+        } else {
+            stats.append("ThreadPool: Not available");
+        }
+
+        return stats.toString();
     }
 }

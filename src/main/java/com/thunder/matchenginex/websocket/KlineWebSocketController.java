@@ -147,8 +147,14 @@ public class KlineWebSocketController {
      */
     private void startKlineScheduler(String symbol, String timeframe, String schedulerKey) {
         ScheduledFuture<?> scheduledTask = taskScheduler.scheduleAtFixedRate(
-            () -> pushKlineUpdate(symbol, timeframe),
-            1000 // 1 second interval - 1秒间隔
+            () -> {
+                try {
+                    pushKlineUpdate(symbol, timeframe);
+                } catch (Exception e) {
+                    log.error("Error in K-line scheduler for {} {}: {}", symbol, timeframe, e.getMessage());
+                }
+            },
+            3000 // 3 second interval - 3秒间隔 (reduced frequency to ease load)
         );
 
         klineSchedulers.put(schedulerKey, scheduledTask);

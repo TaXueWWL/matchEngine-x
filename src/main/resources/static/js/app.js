@@ -201,6 +201,24 @@ function subscribeToUpdates() {
             updateUserBalance(balance);
         });
 
+        // Subscribe to individual order updates - 订阅个人订单更新
+        console.log('📡 Subscribing to order updates for user', currentUserId, 'on topic: /user/' + currentUserId + '/queue/orders');
+        stompClient.subscribe('/user/' + currentUserId + '/queue/orders', function(message) {
+            console.log('✅ Received order update:', message);
+            const orderUpdate = JSON.parse(message.body);
+            console.log('📋 Parsed order update data:', orderUpdate);
+            updateSingleOrder(orderUpdate);
+        });
+
+        // Subscribe to current orders list updates - 订阅当前订单列表更新
+        console.log('📡 Subscribing to current orders updates for user', currentUserId, 'on topic: /user/' + currentUserId + '/queue/current-orders');
+        stompClient.subscribe('/user/' + currentUserId + '/queue/current-orders', function(message) {
+            console.log('✅ Received current orders update:', message);
+            const currentOrdersUpdate = JSON.parse(message.body);
+            console.log('📋 Parsed current orders update data:', currentOrdersUpdate);
+            refreshCurrentOrdersList(currentOrdersUpdate.orders);
+        });
+
         // Subscribe to balance updates for specific currencies
         fetch('/api/trading-pairs/currencies')
             .then(response => response.json())
@@ -232,6 +250,10 @@ function subscribeToUpdates() {
         if (stompClient && (stompClient.connected || (stompClient.state && stompClient.state === 'CONNECTED'))) {
             console.log('Sending subscription request to backend for', currentSymbol);
             stompClient.send('/app/orderbook/subscribe', {}, currentSymbol);
+
+            // Subscribe to order updates for this user - 为当前用户订阅订单更新
+            console.log('📤 Sending order subscription request for user', currentUserId, 'to /app/orders/subscribe');
+            stompClient.send('/app/orders/subscribe', {}, currentUserId.toString());
         }
     } catch (error) {
         console.error('Error subscribing to updates:', error);
@@ -978,6 +1000,92 @@ function updateOrderHistory(orders) {
         `;
         tbody.appendChild(row);
     });
+}
+
+// WebSocket order update functions - WebSocket订单更新功能
+
+/**
+ * Update a single order in the current orders table when receiving real-time updates
+ * 收到实时更新时更新当前订单表中的单个订单
+ */
+function updateSingleOrder(orderUpdate) {
+    console.log('Updating single order:', orderUpdate);
+
+    const tbody = document.getElementById('current-orders-body');
+    if (!tbody) {
+        console.log('Current orders table not found, ignoring update');
+        return;
+    }
+
+    // Find the order row by orderId
+    const orderRow = Array.from(tbody.querySelectorAll('tr')).find(row => {
+        const orderIdCell = row.querySelector('td:first-child');
+        return orderIdCell && orderIdCell.textContent == orderUpdate.orderId;
+    });
+
+    if (orderRow) {
+        // Update existing order row - 更新现有订单行
+        const sideClass = orderUpdate.side === 'BUY' ? 'text-success' : 'text-danger';
+        const sideText = orderUpdate.side === 'BUY' ? '买入' : '卖出';
+        const statusClass = getStatusClass(orderUpdate.status);
+        const statusText = getStatusText(orderUpdate.status);
+
+        orderRow.innerHTML = `
+            <td>${orderUpdate.orderId}</td>
+            <td>${orderUpdate.symbol}</td>
+            <td class="${sideClass}">${sideText}</td>
+            <td>${orderUpdate.type}</td>
+            <td>¥${parseFloat(orderUpdate.price).toFixed(2)}</td>
+            <td>${parseFloat(orderUpdate.quantity).toFixed(6)}</td>
+            <td>${parseFloat(orderUpdate.filledQuantity).toFixed(6)}</td>
+            <td><span class="${statusClass}">${statusText}</span></td>
+            <td>${formatTimestamp(orderUpdate.timestamp)}</td>
+            <td>
+                <div class="btn-group btn-group-sm" role="group">
+                    ${orderUpdate.status === 'NEW' || orderUpdate.status === 'PARTIALLY_FILLED' ? `
+                        <button class="btn btn-outline-warning btn-sm"
+                                onclick="showModifyOrderDialog(${orderUpdate.orderId}, '${orderUpdate.symbol}', ${orderUpdate.price}, ${orderUpdate.remainingQuantity})"
+                                title="修改订单">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm"
+                                onclick="cancelOrder(${orderUpdate.orderId}, '${orderUpdate.symbol}')"
+                                title="取消订单">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            </td>
+        `;
+
+        console.log('Updated order row for orderId:', orderUpdate.orderId);
+
+        // Add visual feedback for the updated row - 为更新的行添加视觉反馈
+        orderRow.style.backgroundColor = '#ffffcc';
+        setTimeout(() => {
+            orderRow.style.backgroundColor = '';
+        }, 2000);
+    } else {
+        console.log('Order row not found for orderId:', orderUpdate.orderId, 'refreshing current orders...');
+        // If order not found, refresh the entire table - 如果找不到订单，刷新整个表格
+        loadCurrentOrders();
+    }
+}
+
+/**
+ * Refresh the entire current orders list when receiving bulk updates
+ * 收到批量更新时刷新整个当前订单列表
+ */
+function refreshCurrentOrdersList(orders) {
+    console.log('Refreshing current orders list with', orders.length, 'orders');
+
+    // Filter orders for current symbol only - 只显示当前交易对的订单
+    const filteredOrders = orders.filter(order => order.symbol === currentSymbol);
+
+    // Use the existing updateCurrentOrders function - 使用现有的updateCurrentOrders函数
+    updateCurrentOrders(filteredOrders);
+
+    console.log('Current orders list refreshed');
 }
 
 function refreshActiveTab() {

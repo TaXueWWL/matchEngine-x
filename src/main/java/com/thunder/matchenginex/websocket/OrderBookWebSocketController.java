@@ -173,7 +173,7 @@ public class OrderBookWebSocketController {
             Long lastUpdate = lastUpdateTime.get(symbol);
 
             if (lastUpdate != null && (currentTime - lastUpdate) < MIN_UPDATE_INTERVAL_MS) {
-                log.debug("Skipping order book update for {} due to rate limiting", symbol);
+//                log.debug("Skipping order book update for {} due to rate limiting", symbol);
                 return;
             }
 
