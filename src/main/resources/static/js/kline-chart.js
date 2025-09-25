@@ -528,7 +528,12 @@ class KlineChart {
             const parsePrice = (value) => {
                 if (value === null || value === undefined) return 0;
                 const num = parseFloat(value);
-                return isNaN(num) || !isFinite(num) ? 0 : num;
+                // 更严格的验证，确保返回的是有效的正数或0
+                if (isNaN(num) || !isFinite(num) || num < 0) {
+                    console.warn(`⚠️ Invalid price value converted to 0:`, value);
+                    return 0;
+                }
+                return num;
             };
 
             const transformedData = {
@@ -920,6 +925,11 @@ class KlineChart {
                 console.warn(`⚠️ Invalid ${prop} value in candle:`, value, candle);
                 return false;
             }
+            // 额外检查负值（除了time）
+            if (prop !== 'time' && value < 0) {
+                console.warn(`⚠️ Negative price value for ${prop}:`, value, candle);
+                return false;
+            }
         }
 
         // 检查时间戳是否有效
@@ -928,9 +938,29 @@ class KlineChart {
             return false;
         }
 
-        // 检查OHLC关系是否有效
+        // 特殊处理：所有价格都为0的情况（心跳数据）
+        const allPricesZero = candle.open === 0 && candle.high === 0 &&
+                             candle.low === 0 && candle.close === 0;
+
+        if (allPricesZero) {
+            console.debug('💓 Validating heartbeat K-line (all zeros):', candle);
+            return true; // 零价格数据是有效的心跳数据
+        }
+
+        // 对于非零数据，检查OHLC关系是否有效
         if (candle.high < candle.low) {
             console.warn('⚠️ Invalid OHLC: high < low:', candle);
+            return false;
+        }
+
+        // 更严格的OHLC关系验证
+        if (candle.high < Math.max(candle.open, candle.close)) {
+            console.warn('⚠️ Invalid OHLC: high < max(open, close):', candle);
+            return false;
+        }
+
+        if (candle.low > Math.min(candle.open, candle.close)) {
+            console.warn('⚠️ Invalid OHLC: low > min(open, close):', candle);
             return false;
         }
 
@@ -965,12 +995,34 @@ class KlineChart {
             });
 
             console.log(`🛡️ Calling setData with ${safeData.length} validated items (filtered from ${data.length})`);
+
+            // Final safety check: ensure series exists and is valid
+            if (!this.candlestickSeries || typeof this.candlestickSeries.setData !== 'function') {
+                console.error('❌ Candlestick series is invalid or missing setData method');
+                return false;
+            }
+
+            // Call with extra error handling for LightweightCharts specific errors
             this.candlestickSeries.setData(safeData);
             return true;
 
         } catch (error) {
             console.error('❌ Error in safeSetData:', error);
+            console.error('❌ Error details:', {
+                message: error.message,
+                stack: error.stack,
+                errorType: error.constructor.name
+            });
             console.error('❌ Data that caused error:', data);
+
+            // Specific handling for LightweightCharts "Value is null" errors
+            if (error.message && error.message.includes('Value is null')) {
+                console.error('🔴 LightweightCharts "Value is null" error detected!');
+                console.error('🔍 This indicates invalid data was passed despite validation');
+                console.error('🔍 Attempting chart recovery...');
+                this.handleChartError(error);
+            }
+
             return false;
         }
     }
@@ -994,12 +1046,34 @@ class KlineChart {
             }
 
             console.log('🛡️ Calling update with validated data');
+
+            // Final safety check: ensure series exists and is valid
+            if (!this.candlestickSeries || typeof this.candlestickSeries.update !== 'function') {
+                console.error('❌ Candlestick series is invalid or missing update method');
+                return false;
+            }
+
+            // Call with extra error handling for LightweightCharts specific errors
             this.candlestickSeries.update(data);
             return true;
 
         } catch (error) {
             console.error('❌ Error in safeUpdate:', error);
+            console.error('❌ Error details:', {
+                message: error.message,
+                stack: error.stack,
+                errorType: error.constructor.name
+            });
             console.error('❌ Data that caused error:', data);
+
+            // Specific handling for LightweightCharts "Value is null" errors
+            if (error.message && error.message.includes('Value is null')) {
+                console.error('🔴 LightweightCharts "Value is null" error detected in update!');
+                console.error('🔍 This indicates invalid data was passed despite validation');
+                console.error('🔍 Attempting chart recovery...');
+                this.handleChartError(error);
+            }
+
             return false;
         }
     }

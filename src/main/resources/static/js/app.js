@@ -671,7 +671,7 @@ function initKLineChart() {
     }
 }
 
-// Function to reinitialize K-line chart after WebSocket connection
+// Function to reinitialize K-line chart
 function reinitializeKlineChart() {
     if (klineChart && typeof klineChart.destroy === 'function') {
         klineChart.destroy();
@@ -1064,7 +1064,7 @@ function formatNumber(num, decimals = 2) {
     return parseFloat(num).toFixed(decimals);
 }
 
-function formatCurrency(amount, currency = '¥') {
+function formatCurrency(amount, currency = '$') {
     return currency + formatNumber(amount);
 }
 
@@ -1168,7 +1168,7 @@ function updateCurrentPrice(priceData) {
 
         // Update price display
         if (lastPriceElement) {
-            lastPriceElement.textContent = `¥${currentPrice.toFixed(2)}`;
+            lastPriceElement.textContent = `＄${currentPrice.toFixed(2)}`;
 
             // Add flash animation for price changes
             lastPriceElement.classList.add('flash-update');

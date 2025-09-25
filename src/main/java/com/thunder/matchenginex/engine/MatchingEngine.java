@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Component
@@ -79,6 +80,9 @@ public class MatchingEngine {
                 log.error("Unsupported order type: {}", order.getType());
                 order.setStatus(OrderStatus.REJECTED);
         }
+
+        // Immediately push order book update after order placement - 下单后立即推送订单簿更新
+        pushOrderBookUpdateAsync(command.getSymbol());
     }
 
     public void cancelOrder(Command command) {
@@ -104,6 +108,9 @@ public class MatchingEngine {
             orderBook.addHistoricalOrder(order);
 
             log.info("Cancelled order: {} and released frozen funds", command.getOrderId());
+
+            // Immediately push order book update after order cancellation - 取消订单后立即推送订单簿更新
+            pushOrderBookUpdateAsync(command.getSymbol());
         } else {
             log.warn("Failed to remove order from order book: {}", command.getOrderId());
         }
@@ -142,6 +149,9 @@ public class MatchingEngine {
 
         // Process the modified order
         processLimitOrder(orderBook, newOrder);
+
+        // Immediately push order book update after order modification - 修改订单后立即推送订单簿更新
+        pushOrderBookUpdateAsync(command.getSymbol());
     }
 
     public void queryOrder(Command command) {
@@ -431,6 +441,28 @@ public class MatchingEngine {
             accountService.unfreezeBalance(order.getUserId(), baseCurrency, order.getRemainingQuantity());
             log.info("Released frozen balance for cancelled sell order: userId={}, currency={}, amount={}",
                 order.getUserId(), baseCurrency, order.getRemainingQuantity());
+        }
+    }
+
+    /**
+     * Asynchronously push order book updates via WebSocket - 通过WebSocket异步推送订单簿更新
+     * This ensures real-time updates without blocking the matching engine - 确保实时更新而不阻塞撮合引擎
+     */
+    private void pushOrderBookUpdateAsync(String symbol) {
+        if (webSocketController != null) {
+            try {
+                // Use a separate thread to avoid blocking the matching engine - 使用单独线程避免阻塞撮合引擎
+                CompletableFuture.runAsync(() -> {
+                    webSocketController.pushImmediateUpdate(symbol);
+                }).exceptionally(ex -> {
+                    log.error("Error pushing WebSocket update for symbol {}: {}", symbol, ex.getMessage());
+                    return null;
+                });
+            } catch (Exception e) {
+                log.error("Error initiating WebSocket update for symbol {}: {}", symbol, e.getMessage());
+            }
+        } else {
+            log.debug("WebSocket controller not available for pushing updates");
         }
     }
 }

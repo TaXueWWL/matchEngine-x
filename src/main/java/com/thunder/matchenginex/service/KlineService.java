@@ -133,6 +133,10 @@ public class KlineService {
 
         long currentTime = System.currentTimeMillis();
 
+        // Use a small default price instead of zero to avoid frontend chart issues
+        // 使用小的默认价格而不是零，以避免前端图表问题
+        BigDecimal defaultPrice = new BigDecimal("0.001");
+
         for (int i = count - 1; i >= 0; i--) {
             long klineTime = currentTime - (i * intervalSeconds * 1000);
             long alignedTimestamp = alignToInterval(klineTime, intervalSeconds);
@@ -141,10 +145,10 @@ public class KlineService {
                 .symbol(symbol)
                 .timeframe(timeframe)
                 .timestamp(alignedTimestamp)
-                .open(BigDecimal.ZERO)
-                .high(BigDecimal.ZERO)
-                .low(BigDecimal.ZERO)
-                .close(BigDecimal.ZERO)
+                .open(defaultPrice)
+                .high(defaultPrice)
+                .low(defaultPrice)
+                .close(defaultPrice)
                 .volume(BigDecimal.ZERO)
                 .amount(BigDecimal.ZERO)
                 .tradeCount(0)
@@ -153,6 +157,8 @@ public class KlineService {
             emptyKlines.add(emptyKline);
         }
 
+//        log.debug("Generated {} initial empty K-lines for {} {} with default price {}",
+//                count, symbol, timeframe, defaultPrice);
         return emptyKlines;
     }
 

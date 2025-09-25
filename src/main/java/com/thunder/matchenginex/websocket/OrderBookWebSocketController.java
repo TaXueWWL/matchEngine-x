@@ -42,6 +42,10 @@ public class OrderBookWebSocketController {
     // Individual schedulers for each symbol to prevent thread conflicts - 每个交易对的独立调度器以防止线程冲突
     private final Map<String, ScheduledFuture<?>> symbolSchedulers = new ConcurrentHashMap<>();
 
+    // Track last update times to prevent excessive pushes - 跟踪最后更新时间以防止过度推送
+    private final Map<String, Long> lastUpdateTime = new ConcurrentHashMap<>();
+    private static final long MIN_UPDATE_INTERVAL_MS = 100; // Minimum 100ms between updates - 最小更新间隔100毫秒
+
     @Autowired
     private ThreadPoolTaskScheduler taskScheduler;
 
@@ -60,7 +64,7 @@ public class OrderBookWebSocketController {
 
         ScheduledFuture<?> scheduledTask = taskScheduler.scheduleAtFixedRate(
             () -> pushUpdatesForSymbol(symbol),
-            1000 // 1 second interval - 1秒间隔
+            5000 // 5 second interval - 5秒间隔 (reduced frequency since we have immediate pushes)
         );
 
         symbolSchedulers.put(symbol, scheduledTask);
@@ -142,6 +146,76 @@ public class OrderBookWebSocketController {
     public void updateLastTradePrice(String symbol, BigDecimal tradePrice) {
         lastTradePrice.put(symbol, tradePrice);
         log.debug("Updated last trade price for {}: {}", symbol, tradePrice);
+
+        // Immediately push price update - 立即推送价格更新
+        try {
+            LastPriceDto priceDto = LastPriceDto.builder()
+                    .symbol(symbol)
+                    .price(tradePrice)
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+            messagingTemplate.convertAndSend("/topic/price/" + symbol, priceDto);
+            lastPrice.put(symbol, tradePrice);
+            log.debug("Immediately pushed trade price update for {}: {}", symbol, tradePrice);
+        } catch (Exception e) {
+            log.error("Error immediately pushing price update for {}", symbol, e);
+        }
+    }
+
+    /**
+     * Trigger immediate order book push for a symbol when orders change - 当订单变化时立即触发订单簿推送
+     * This should be called whenever orders are placed, cancelled, or matched - 当订单被下达、取消或撮合时应调用此方法
+     */
+    public void pushOrderBookUpdate(String symbol) {
+        try {
+            // Rate limiting to prevent excessive pushes - 速率限制以防止过度推送
+            long currentTime = System.currentTimeMillis();
+            Long lastUpdate = lastUpdateTime.get(symbol);
+
+            if (lastUpdate != null && (currentTime - lastUpdate) < MIN_UPDATE_INTERVAL_MS) {
+                log.debug("Skipping order book update for {} due to rate limiting", symbol);
+                return;
+            }
+
+            OrderBook orderBook = tradingService.getOrderBook(symbol);
+            if (orderBook != null) {
+                // Check if the order book actually changed - 检查订单簿是否真的改变了
+                String currentHash = createOrderBookHash(orderBook);
+                String lastHash = lastOrderBookHash.get(symbol);
+
+                if (!currentHash.equals(lastHash)) {
+                    OrderBookDto orderBookDto = convertToOrderBookDto(orderBook, symbol);
+                    messagingTemplate.convertAndSend("/topic/orderbook/" + symbol, orderBookDto);
+
+                    // Update hash and timestamp - 更新哈希和时间戳
+                    lastOrderBookHash.put(symbol, currentHash);
+                    lastUpdateTime.put(symbol, currentTime);
+
+                    log.debug("Immediately pushed order book update for {}", symbol);
+                } else {
+                    log.debug("Order book unchanged for {}, skipping push", symbol);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error immediately pushing order book update for {}", symbol, e);
+        }
+    }
+
+    /**
+     * Combined method to push both order book and price updates immediately - 立即推送订单簿和价格更新的组合方法
+     */
+    public void pushImmediateUpdate(String symbol) {
+        pushOrderBookUpdate(symbol);
+
+        // Also push current price if available - 如果可用也推送当前价格
+        try {
+            OrderBook orderBook = tradingService.getOrderBook(symbol);
+            if (orderBook != null) {
+                pushLatestPriceUpdate(symbol, orderBook);
+            }
+        } catch (Exception e) {
+            log.error("Error pushing immediate price update for {}", symbol, e);
+        }
     }
 
     /**
