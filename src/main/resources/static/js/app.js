@@ -550,9 +550,10 @@ function updateCurrentPriceFromOrderBook(buyLevels, sellLevels) {
         }
     }
 
-    if (lastPriceElement && !lastPriceElement.textContent.includes('¥')) {
-        lastPriceElement.textContent = '?';
-    }
+    // 移除有问题的价格重置逻辑
+    // 最新成交价应该保持显示直到有新的成交价更新，不应该被订单簿更新重置
+    // REMOVED: Problematic price reset logic
+    // Latest price should persist until new trade price is received, not reset by order book updates
 }
 
 function setupOrderForms() {

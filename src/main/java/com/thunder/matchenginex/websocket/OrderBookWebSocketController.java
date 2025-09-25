@@ -1,17 +1,18 @@
 package com.thunder.matchenginex.websocket;
 
 import com.thunder.matchenginex.orderbook.OrderBook;
+import com.thunder.matchenginex.orderbook.PriceLevel;
 import com.thunder.matchenginex.service.TradingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.beans.factory.annotation.Autowired;
 import javax.annotation.PostConstruct;
 
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -272,16 +273,36 @@ public class OrderBookWebSocketController {
     }
 
     private OrderBookDto convertToOrderBookDto(OrderBook orderBook, String symbol) {
+        // 创建订单簿快照，避免在推送过程中数据被撮合引擎修改
+        OrderBook.OrderBookSnapshot snapshot = orderBook.createSnapshot();
+
+        // 从快照获取数据，确保数据一致性
+        List<OrderBook.PriceLevelSnapshot> buyLevels = snapshot.getBuyLevels(10);  // 高价到低价
+        List<OrderBook.PriceLevelSnapshot> sellLevels = snapshot.getSellLevels(10); // 低价到高价
+
+        log.debug("Converting orderbook snapshot for {}: {} buy levels, {} sell levels",
+            symbol, buyLevels.size(), sellLevels.size());
+
+        // 打印前3个买单和卖单的价格用于调试
+        if (!buyLevels.isEmpty()) {
+            log.info("Top 3 buy levels: {}",
+                buyLevels.stream().limit(3).map(level -> level.getPrice().toString()).toList());
+        }
+        if (!sellLevels.isEmpty()) {
+            log.info("Top 3 sell levels: {}",
+                sellLevels.stream().limit(3).map(level -> level.getPrice().toString()).toList());
+        }
+
         return OrderBookDto.builder()
                 .symbol(symbol)
-                .buyLevels(orderBook.getBuyLevels(10).stream()
+                .buyLevels(buyLevels.stream()
                     .map(level -> PriceLevelDto.builder()
                         .price(level.getPrice())
                         .totalQuantity(level.getTotalQuantity())
                         .orderCount(level.getOrderCount())
                         .build())
                     .toList())
-                .sellLevels(orderBook.getSellLevels(10).stream()
+                .sellLevels(sellLevels.stream()
                     .map(level -> PriceLevelDto.builder()
                         .price(level.getPrice())
                         .totalQuantity(level.getTotalQuantity())

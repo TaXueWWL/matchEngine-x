@@ -191,4 +191,71 @@ public class OrderBook {
     public Order getHistoricalOrder(long orderId) {
         return historicalOrders.get(orderId);
     }
+
+    /**
+     * 创建订单簿的快照副本用于推送，避免并发访问问题
+     * Create a snapshot copy of the order book for push operations to avoid concurrent access issues
+     */
+    public OrderBookSnapshot createSnapshot() {
+        // 创建价格层级的快照（深拷贝价格和数量信息，但不拷贝Order对象引用）
+        List<PriceLevelSnapshot> buyLevelsSnapshot = buyLevels.entrySet().stream()
+                .map(entry -> new PriceLevelSnapshot(
+                    entry.getKey(),
+                    entry.getValue().getTotalQuantity(),
+                    entry.getValue().getOrderCount()
+                ))
+                .toList();
+
+        List<PriceLevelSnapshot> sellLevelsSnapshot = sellLevels.entrySet().stream()
+                .map(entry -> new PriceLevelSnapshot(
+                    entry.getKey(),
+                    entry.getValue().getTotalQuantity(),
+                    entry.getValue().getOrderCount()
+                ))
+                .toList();
+
+        return new OrderBookSnapshot(symbol, buyLevelsSnapshot, sellLevelsSnapshot);
+    }
+
+    /**
+     * 订单簿快照数据结构
+     */
+    public static class OrderBookSnapshot {
+        private final String symbol;
+        private final List<PriceLevelSnapshot> buyLevels;
+        private final List<PriceLevelSnapshot> sellLevels;
+
+        public OrderBookSnapshot(String symbol, List<PriceLevelSnapshot> buyLevels, List<PriceLevelSnapshot> sellLevels) {
+            this.symbol = symbol;
+            this.buyLevels = buyLevels;
+            this.sellLevels = sellLevels;
+        }
+
+        public String getSymbol() { return symbol; }
+        public List<PriceLevelSnapshot> getBuyLevels(int maxLevels) {
+            return buyLevels.stream().limit(maxLevels).toList();
+        }
+        public List<PriceLevelSnapshot> getSellLevels(int maxLevels) {
+            return sellLevels.stream().limit(maxLevels).toList();
+        }
+    }
+
+    /**
+     * 价格层级快照数据结构
+     */
+    public static class PriceLevelSnapshot {
+        private final BigDecimal price;
+        private final BigDecimal totalQuantity;
+        private final int orderCount;
+
+        public PriceLevelSnapshot(BigDecimal price, BigDecimal totalQuantity, int orderCount) {
+            this.price = price;
+            this.totalQuantity = totalQuantity;
+            this.orderCount = orderCount;
+        }
+
+        public BigDecimal getPrice() { return price; }
+        public BigDecimal getTotalQuantity() { return totalQuantity; }
+        public int getOrderCount() { return orderCount; }
+    }
 }
